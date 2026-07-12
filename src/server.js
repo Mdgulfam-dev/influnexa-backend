@@ -5,6 +5,7 @@ import { connectDatabase } from "./config/db.js";
 import adminRouter from "./routes/admin.js";
 import blogsRouter from "./routes/blogs.js";
 import registrationsRouter from "./routes/registrations.js";
+import testimonialsRouter from "./routes/testimonials.js";
 
 dotenv.config();
 
@@ -46,6 +47,7 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/registrations", registrationsRouter);
 app.use("/api/blogs", blogsRouter);
+app.use("/api/testimonials", testimonialsRouter);
 app.use("/api/admin", adminRouter);
 
 app.use((req, res) => {

@@ -3,6 +3,7 @@ import AdminUser, { createSessionToken, hashToken } from "../models/AdminUser.js
 import BlogPost from "../models/BlogPost.js";
 import BrandRegistration from "../models/BrandRegistration.js";
 import InfluencerRegistration from "../models/InfluencerRegistration.js";
+import Testimonial from "../models/Testimonial.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 
 const router = express.Router();
@@ -95,10 +96,11 @@ router.use(requireAdmin);
 
 router.get("/dashboard", async (req, res, next) => {
   try {
-    const [brands, influencers, blogs, users] = await Promise.all([
+    const [brands, influencers, blogs, testimonials, users] = await Promise.all([
       BrandRegistration.find().sort({ createdAt: -1 }).limit(200),
       InfluencerRegistration.find().sort({ createdAt: -1 }).limit(200),
       BlogPost.find().sort({ publishedAt: -1, createdAt: -1 }).limit(200),
+      Testimonial.find().sort({ createdAt: -1 }).limit(200),
       AdminUser.find().sort({ createdAt: -1 }).limit(200),
     ]);
 
@@ -107,14 +109,17 @@ router.get("/dashboard", async (req, res, next) => {
         brands: brands.length,
         influencers: influencers.length,
         blogs: blogs.length,
+        testimonials: testimonials.length,
         users: users.length,
         newBrands: brands.filter((brand) => brand.status === "new").length,
         newInfluencers: influencers.filter((influencer) => influencer.status === "new").length,
         publishedBlogs: blogs.filter((blog) => blog.status === "published").length,
+        pendingTestimonials: testimonials.filter((testimonial) => testimonial.status === "pending").length,
       },
       brands,
       influencers,
       blogs,
+      testimonials,
       users: users.map(publicUser),
       currentUser: req.adminUser?._id ? publicUser(req.adminUser) : req.adminUser,
     });
@@ -271,6 +276,53 @@ router.patch("/influencers/:id/status", async (req, res, next) => {
     }
 
     res.json({ message: "Influencer status updated.", influencer });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/testimonials/:id/status", async (req, res, next) => {
+  try {
+    const update = { $set: { status: req.body.status }, $unset: {} };
+
+    if (req.body.status === "approved") {
+      update.$set.approvedAt = new Date();
+    }
+
+    if (req.body.status !== "approved") {
+      update.$unset.approvedAt = "";
+    }
+
+    if (Object.keys(update.$unset).length === 0) {
+      delete update.$unset;
+    }
+
+    const testimonial = await Testimonial.findByIdAndUpdate(req.params.id, update, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!testimonial) {
+      return res.status(404).json({ message: "Testimonial not found." });
+    }
+
+    res.json({ message: "Testimonial status updated.", testimonial });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/testimonials/:id", async (req, res, next) => {
+  try {
+    const testimonial = await Testimonial.findById(req.params.id);
+
+    if (!testimonial) {
+      return res.status(404).json({ message: "Testimonial not found." });
+    }
+
+    await testimonial.deleteOne();
+
+    res.json({ message: "Testimonial deleted successfully." });
   } catch (error) {
     next(error);
   }
