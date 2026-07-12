@@ -177,6 +177,16 @@ router.patch("/users/:id", async (req, res, next) => {
       return res.status(404).json({ message: "Admin user not found." });
     }
 
+    if (user.role === "owner") {
+      if (update.role && update.role !== "owner") {
+        return res.status(403).json({ message: "Owner access cannot be removed." });
+      }
+
+      if (update.status && update.status !== "active") {
+        return res.status(403).json({ message: "Owner access cannot be disabled." });
+      }
+    }
+
     Object.assign(user, update);
 
     if (req.body.password) {
@@ -212,11 +222,17 @@ router.delete("/users/:id", async (req, res, next) => {
       return res.status(400).json({ message: "You cannot delete your own admin account." });
     }
 
-    const user = await AdminUser.findByIdAndDelete(req.params.id);
+    const user = await AdminUser.findById(req.params.id);
 
     if (!user) {
       return res.status(404).json({ message: "Admin user not found." });
     }
+
+    if (user.role === "owner") {
+      return res.status(403).json({ message: "Owner access cannot be deleted." });
+    }
+
+    await user.deleteOne();
 
     res.json({ message: "Admin user deleted successfully." });
   } catch (error) {
