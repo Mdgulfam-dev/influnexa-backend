@@ -8,6 +8,51 @@ import { requireAdmin } from "../middleware/adminAuth.js";
 
 const router = express.Router();
 
+const MAX_REGISTRATION_PAGE_SIZE = 100;
+
+function escapeRegex(value = "") {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function paginationFromQuery(query, prefix) {
+  const page = Math.max(Number.parseInt(query[`${prefix}Page`], 10) || 1, 1);
+  const requestedLimit = Number.parseInt(query[`${prefix}Limit`], 10) || 25;
+  const limit = Math.min(Math.max(requestedLimit, 10), MAX_REGISTRATION_PAGE_SIZE);
+
+  return { limit, page, skip: (page - 1) * limit };
+}
+
+function buildSearchFilter(search, fields) {
+  const trimmedSearch = String(search || "").trim();
+
+  if (!trimmedSearch) {
+    return {};
+  }
+
+  const regex = new RegExp(escapeRegex(trimmedSearch), "i");
+  return { $or: fields.map((field) => ({ [field]: regex })) };
+}
+
+function buildStatusFilter(status, aliases = {}) {
+  const trimmedStatus = String(status || "").trim();
+
+  if (!trimmedStatus) {
+    return {};
+  }
+
+  const statuses = aliases[trimmedStatus] || [trimmedStatus];
+  return { status: { $in: statuses } };
+}
+
+function pageMeta({ limit, page }, total) {
+  return {
+    limit,
+    page,
+    total,
+    totalPages: Math.max(Math.ceil(total / limit), 1),
+  };
+}
+
 function publicUser(user) {
   return {
     _id: user._id,
@@ -96,9 +141,60 @@ router.use(requireAdmin);
 
 router.get("/dashboard", async (req, res, next) => {
   try {
-    const [brands, influencers, blogs, testimonials, users] = await Promise.all([
-      BrandRegistration.find().sort({ createdAt: -1 }),
-      InfluencerRegistration.find().sort({ createdAt: -1 }),
+    const brandPage = paginationFromQuery(req.query, "brand");
+    const influencerPage = paginationFromQuery(req.query, "influencer");
+    const brandFilter = {
+      ...buildSearchFilter(req.query.brandSearch, [
+        "companyName",
+        "contactName",
+        "email",
+        "phone",
+        "country",
+        "industry",
+        "productName",
+      ]),
+      ...buildStatusFilter(req.query.brandStatus, {
+        New: ["New", "new"],
+        Contacted: ["Contacted", "contacted"],
+        "Under Review": ["Under Review", "qualified"],
+        Closed: ["Closed", "closed"],
+      }),
+    };
+    const influencerFilter = {
+      ...buildSearchFilter(req.query.influencerSearch, [
+        "creatorName",
+        "fullName",
+        "email",
+        "phone",
+        "country",
+        "city",
+        "primaryPlatform",
+        "categories",
+      ]),
+      ...buildStatusFilter(req.query.influencerStatus),
+    };
+
+    const [
+      brands,
+      brandTotal,
+      brandCount,
+      newBrandCount,
+      influencers,
+      influencerTotal,
+      influencerCount,
+      newInfluencerCount,
+      blogs,
+      testimonials,
+      users,
+    ] = await Promise.all([
+      BrandRegistration.find(brandFilter).sort({ createdAt: -1 }).skip(brandPage.skip).limit(brandPage.limit).lean(),
+      Object.keys(brandFilter).length ? BrandRegistration.countDocuments(brandFilter) : BrandRegistration.estimatedDocumentCount(),
+      BrandRegistration.estimatedDocumentCount(),
+      BrandRegistration.countDocuments({ status: { $in: ["New", "new"] } }),
+      InfluencerRegistration.find(influencerFilter).sort({ createdAt: -1 }).skip(influencerPage.skip).limit(influencerPage.limit).lean(),
+      Object.keys(influencerFilter).length ? InfluencerRegistration.countDocuments(influencerFilter) : InfluencerRegistration.estimatedDocumentCount(),
+      InfluencerRegistration.estimatedDocumentCount(),
+      InfluencerRegistration.countDocuments({ status: "new" }),
       BlogPost.find().sort({ publishedAt: -1, createdAt: -1 }).limit(200),
       Testimonial.find().sort({ createdAt: -1 }).limit(200),
       AdminUser.find().sort({ createdAt: -1 }).limit(200),
@@ -106,15 +202,19 @@ router.get("/dashboard", async (req, res, next) => {
 
     res.json({
       stats: {
-        brands: brands.length,
-        influencers: influencers.length,
+        brands: brandCount,
+        influencers: influencerCount,
         blogs: blogs.length,
         testimonials: testimonials.length,
         users: users.length,
-        newBrands: brands.filter((brand) => ["New", "new"].includes(brand.status)).length,
-        newInfluencers: influencers.filter((influencer) => influencer.status === "new").length,
+        newBrands: newBrandCount,
+        newInfluencers: newInfluencerCount,
         publishedBlogs: blogs.filter((blog) => blog.status === "published").length,
         pendingTestimonials: testimonials.filter((testimonial) => testimonial.status === "pending").length,
+      },
+      pagination: {
+        brands: pageMeta(brandPage, brandTotal),
+        influencers: pageMeta(influencerPage, influencerTotal),
       },
       brands,
       influencers,

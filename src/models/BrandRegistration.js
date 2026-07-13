@@ -54,4 +54,17 @@ const brandRegistrationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+brandRegistrationSchema.index({ status: 1, createdAt: -1 });
+brandRegistrationSchema.index({ email: 1 });
+brandRegistrationSchema.index({ companyName: 1 });
+brandRegistrationSchema.index({
+  companyName: "text",
+  contactName: "text",
+  email: "text",
+  phone: "text",
+  country: "text",
+  industry: "text",
+  productName: "text",
+});
+
 export default mongoose.model("BrandRegistration", brandRegistrationSchema);

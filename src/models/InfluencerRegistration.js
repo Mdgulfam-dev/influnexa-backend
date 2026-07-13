@@ -33,4 +33,18 @@ const influencerRegistrationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+influencerRegistrationSchema.index({ status: 1, createdAt: -1 });
+influencerRegistrationSchema.index({ email: 1 });
+influencerRegistrationSchema.index({ creatorName: 1 });
+influencerRegistrationSchema.index({
+  creatorName: "text",
+  fullName: "text",
+  email: "text",
+  phone: "text",
+  country: "text",
+  city: "text",
+  primaryPlatform: "text",
+  categories: "text",
+});
+
 export default mongoose.model("InfluencerRegistration", influencerRegistrationSchema);
