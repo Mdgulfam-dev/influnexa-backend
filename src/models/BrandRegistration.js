@@ -1,5 +1,28 @@
 import mongoose from "mongoose";
 
+export const brandStatuses = [
+  "New",
+  "Under Review",
+  "Contacted",
+  "Follow-up 1",
+  "Follow-up 2",
+  "Meeting Scheduled",
+  "Requirement Received",
+  "Proposal Sent",
+  "Negotiation",
+  "Deal Won",
+  "Campaign Started",
+  "Campaign Completed",
+  "Repeat Client",
+  "No Response",
+  "Lost",
+  "Closed",
+  "new",
+  "contacted",
+  "qualified",
+  "closed",
+];
+
 const brandRegistrationSchema = new mongoose.Schema(
   {
     contactName: { type: String, required: true, trim: true },
@@ -24,8 +47,8 @@ const brandRegistrationSchema = new mongoose.Schema(
     notes: { type: String, trim: true },
     status: {
       type: String,
-      enum: ["new", "contacted", "qualified", "closed"],
-      default: "new",
+      enum: brandStatuses,
+      default: "New",
     },
   },
   { timestamps: true }

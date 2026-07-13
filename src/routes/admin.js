@@ -97,8 +97,8 @@ router.use(requireAdmin);
 router.get("/dashboard", async (req, res, next) => {
   try {
     const [brands, influencers, blogs, testimonials, users] = await Promise.all([
-      BrandRegistration.find().sort({ createdAt: -1 }).limit(200),
-      InfluencerRegistration.find().sort({ createdAt: -1 }).limit(200),
+      BrandRegistration.find().sort({ createdAt: -1 }),
+      InfluencerRegistration.find().sort({ createdAt: -1 }),
       BlogPost.find().sort({ publishedAt: -1, createdAt: -1 }).limit(200),
       Testimonial.find().sort({ createdAt: -1 }).limit(200),
       AdminUser.find().sort({ createdAt: -1 }).limit(200),
@@ -111,7 +111,7 @@ router.get("/dashboard", async (req, res, next) => {
         blogs: blogs.length,
         testimonials: testimonials.length,
         users: users.length,
-        newBrands: brands.filter((brand) => brand.status === "new").length,
+        newBrands: brands.filter((brand) => ["New", "new"].includes(brand.status)).length,
         newInfluencers: influencers.filter((influencer) => influencer.status === "new").length,
         publishedBlogs: blogs.filter((blog) => blog.status === "published").length,
         pendingTestimonials: testimonials.filter((testimonial) => testimonial.status === "pending").length,
