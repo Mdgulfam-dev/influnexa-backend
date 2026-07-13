@@ -244,6 +244,10 @@ router.post("/users", async (req, res, next) => {
       return res.status(400).json({ message: "Password must be at least 8 characters." });
     }
 
+    if (role === "owner" && req.adminUser?.role !== "owner") {
+      return res.status(403).json({ message: "Only the owner can create another owner account." });
+    }
+
     const user = new AdminUser({ name, email, role, status });
     user.setPassword(password);
     await user.save();
@@ -258,6 +262,44 @@ router.post("/users", async (req, res, next) => {
     }
 
     return next(error);
+  }
+});
+
+router.patch("/users/me/password", async (req, res, next) => {
+  try {
+    if (!req.adminUser?._id) {
+      return res.status(403).json({ message: "Bootstrap access cannot change a user password." });
+    }
+
+    const { currentPassword, password } = req.body;
+
+    if (!currentPassword || !password) {
+      return res.status(400).json({ message: "Current password and new password are required." });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters." });
+    }
+
+    const user = await AdminUser.findById(req.adminUser._id);
+
+    if (!user || user.status !== "active") {
+      return res.status(404).json({ message: "Admin user not found." });
+    }
+
+    if (!user.verifyPassword(currentPassword)) {
+      return res.status(401).json({ message: "Current password is incorrect." });
+    }
+
+    user.setPassword(password);
+    await user.save();
+
+    res.json({
+      message: "Password updated successfully.",
+      user: publicUser(user),
+    });
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -292,14 +334,14 @@ router.patch("/users/:id", async (req, res, next) => {
       }
     }
 
+    if (update.role === "owner" && req.adminUser?.role !== "owner") {
+      return res.status(403).json({ message: "Only the owner can assign owner access." });
+    }
+
     Object.assign(user, update);
 
     if (req.body.password) {
-      if (req.body.password.length < 8) {
-        return res.status(400).json({ message: "Password must be at least 8 characters." });
-      }
-      user.setPassword(req.body.password);
-      user.sessionTokenHash = undefined;
+      return res.status(403).json({ message: "Users can only change their own password from the password form." });
     }
 
     await user.save();
