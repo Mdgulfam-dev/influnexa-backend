@@ -46,6 +46,27 @@ function normalizeArray(value) {
   return [];
 }
 
+function normalizeText(value) {
+  return String(value || "").trim();
+}
+
+function normalizeEmail(value) {
+  return normalizeText(value).toLowerCase();
+}
+
+function normalizeProfile(value) {
+  return normalizeText(value).replace(/\/+$/, "").toLowerCase();
+}
+
+function exactCaseInsensitive(value) {
+  const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${escapedValue}$`, "i");
+}
+
+function duplicateRegistrationResponse(res, message) {
+  return res.status(409).json({ message });
+}
+
 router.post("/brands", async (req, res, next) => {
   try {
     const missing = missingFields(req.body, requiredBrandFields);
@@ -57,8 +78,26 @@ router.post("/brands", async (req, res, next) => {
       });
     }
 
+    const email = normalizeEmail(req.body.email);
+    const companyName = normalizeText(req.body.companyName);
+    const existingRegistration = await BrandRegistration.exists({
+      $or: [
+        { email },
+        { companyName: exactCaseInsensitive(companyName) },
+      ],
+    });
+
+    if (existingRegistration) {
+      return duplicateRegistrationResponse(
+        res,
+        "A brand registration with this email or company name already exists. Please contact our team if you need to update your details."
+      );
+    }
+
     const registration = await BrandRegistration.create({
       ...req.body,
+      email,
+      companyName,
       campaignTypes: normalizeArray(req.body.campaignTypes),
       preferredPlatforms: normalizeArray(req.body.preferredPlatforms),
     });
@@ -68,6 +107,10 @@ router.post("/brands", async (req, res, next) => {
       id: registration._id,
     });
   } catch (error) {
+    if (error?.code === 11000) {
+      return duplicateRegistrationResponse(res, "A brand registration with this email already exists.");
+    }
+
     return next(error);
   }
 });
@@ -87,8 +130,26 @@ router.post("/influencers", async (req, res, next) => {
       });
     }
 
+    const email = normalizeEmail(req.body.email);
+    const primaryProfile = normalizeProfile(req.body.primaryProfile);
+    const existingRegistration = await InfluencerRegistration.exists({
+      $or: [
+        { email },
+        { primaryProfile: exactCaseInsensitive(primaryProfile) },
+      ],
+    });
+
+    if (existingRegistration) {
+      return duplicateRegistrationResponse(
+        res,
+        "An influencer profile with this email or social profile already exists. Please contact our team if you need to update your details."
+      );
+    }
+
     const registration = await InfluencerRegistration.create({
       ...req.body,
+      email,
+      primaryProfile,
       categories: normalizeArray(req.body.categories),
       contentTypes: normalizeArray(req.body.contentTypes),
     });
@@ -98,6 +159,10 @@ router.post("/influencers", async (req, res, next) => {
       id: registration._id,
     });
   } catch (error) {
+    if (error?.code === 11000) {
+      return duplicateRegistrationResponse(res, "An influencer profile with this email or social profile already exists.");
+    }
+
     return next(error);
   }
 });
