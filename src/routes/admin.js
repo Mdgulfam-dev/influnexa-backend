@@ -6,6 +6,7 @@ import InfluencerRegistration from "../models/InfluencerRegistration.js";
 import Testimonial from "../models/Testimonial.js";
 import Job from "../models/Job.js";
 import JobApplication from "../models/JobApplication.js";
+import { sendApplicationStatusEmail } from "../services/sendgrid.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 
 const router = express.Router();
@@ -275,7 +276,28 @@ router.patch("/jobs/:id", async (req, res, next) => {
   try { const payload = jobPayload(req.body); if (payload.error) return res.status(400).json({ message: payload.error }); const job = await Job.findByIdAndUpdate(req.params.id, payload.value, { new: true, runValidators: true }); if (!job) return res.status(404).json({ message: "Job not found." }); return res.json({ job }); } catch (error) { return next(error); }
 });
 router.delete("/jobs/:id", async (req, res, next) => { try { const job = await Job.findByIdAndDelete(req.params.id); if (!job) return res.status(404).json({ message: "Job not found." }); return res.json({ message: "Job deleted." }); } catch (error) { return next(error); } });
-router.patch("/applications/:id/status", async (req, res, next) => { try { const application = await JobApplication.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true, runValidators: true }); if (!application) return res.status(404).json({ message: "Application not found." }); return res.json({ application }); } catch (error) { return next(error); } });
+router.patch("/applications/:id/status", async (req, res, next) => {
+  try {
+    const application = await JobApplication.findById(req.params.id);
+    if (!application) return res.status(404).json({ message: "Application not found." });
+
+    const statusChanged = application.status !== req.body.status;
+    application.status = req.body.status;
+    await application.save();
+
+    let email = { sent: false, skipped: true };
+    if (statusChanged) {
+      try {
+        email = await sendApplicationStatusEmail(application);
+      } catch (emailError) {
+        console.error("Candidate status email failed:", emailError.message);
+        email = { sent: false, skipped: false, reason: emailError.message };
+      }
+    }
+
+    return res.json({ application, email });
+  } catch (error) { return next(error); }
+});
 
 router.post("/users", async (req, res, next) => {
   if (!canManageUsers(req.adminUser)) {
