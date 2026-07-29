@@ -4,6 +4,8 @@ import BlogPost from "../models/BlogPost.js";
 import BrandRegistration from "../models/BrandRegistration.js";
 import InfluencerRegistration from "../models/InfluencerRegistration.js";
 import Testimonial from "../models/Testimonial.js";
+import Job from "../models/Job.js";
+import JobApplication from "../models/JobApplication.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 
 const router = express.Router();
@@ -143,6 +145,7 @@ router.get("/dashboard", async (req, res, next) => {
   try {
     const brandPage = paginationFromQuery(req.query, "brand");
     const influencerPage = paginationFromQuery(req.query, "influencer");
+    const candidatePage = paginationFromQuery(req.query, "candidate");
     const brandFilter = {
       ...buildSearchFilter(req.query.brandSearch, [
         "companyName",
@@ -173,6 +176,11 @@ router.get("/dashboard", async (req, res, next) => {
       ]),
       ...buildStatusFilter(req.query.influencerStatus),
     };
+    const candidateFilter = {
+      ...buildSearchFilter(req.query.candidateSearch, ["name", "email", "phone", "jobId", "jobTitle"]),
+      ...buildStatusFilter(req.query.candidateStatus),
+      ...(String(req.query.candidateJobId || "").trim() ? { jobId: new RegExp(`^${escapeRegex(req.query.candidateJobId.trim())}$`, "i") } : {}),
+    };
 
     const [
       brands,
@@ -186,6 +194,10 @@ router.get("/dashboard", async (req, res, next) => {
       blogs,
       testimonials,
       users,
+      jobs,
+      applications,
+      applicationTotal,
+      applicationCount,
     ] = await Promise.all([
       BrandRegistration.find(brandFilter).sort({ createdAt: -1 }).skip(brandPage.skip).limit(brandPage.limit).lean(),
       Object.keys(brandFilter).length ? BrandRegistration.countDocuments(brandFilter) : BrandRegistration.estimatedDocumentCount(),
@@ -198,6 +210,10 @@ router.get("/dashboard", async (req, res, next) => {
       BlogPost.find().sort({ publishedAt: -1, createdAt: -1 }).limit(200),
       Testimonial.find().sort({ createdAt: -1 }).limit(200),
       AdminUser.find().sort({ createdAt: -1 }).limit(200),
+      Job.find().sort({ createdAt: -1 }).lean(),
+      JobApplication.find(candidateFilter).sort({ createdAt: -1 }).skip(candidatePage.skip).limit(candidatePage.limit).lean(),
+      Object.keys(candidateFilter).length ? JobApplication.countDocuments(candidateFilter) : JobApplication.estimatedDocumentCount(),
+      JobApplication.estimatedDocumentCount(),
     ]);
 
     res.json({
@@ -207,6 +223,9 @@ router.get("/dashboard", async (req, res, next) => {
         blogs: blogs.length,
         testimonials: testimonials.length,
         users: users.length,
+        jobs: jobs.length,
+        applications: applicationCount,
+        reviewApplications: await JobApplication.countDocuments({ status: "Review" }),
         newBrands: newBrandCount,
         newInfluencers: newInfluencerCount,
         publishedBlogs: blogs.filter((blog) => blog.status === "published").length,
@@ -215,18 +234,48 @@ router.get("/dashboard", async (req, res, next) => {
       pagination: {
         brands: pageMeta(brandPage, brandTotal),
         influencers: pageMeta(influencerPage, influencerTotal),
+        applications: pageMeta(candidatePage, applicationTotal),
       },
       brands,
       influencers,
       blogs,
       testimonials,
       users: users.map(publicUser),
+      jobs,
+      applications,
       currentUser: req.adminUser?._id ? publicUser(req.adminUser) : req.adminUser,
     });
   } catch (error) {
     next(error);
   }
 });
+
+function jobPayload(body, { includeJobId = false } = {}) {
+  const fields = ["title", "department", "type", "location", "experience", "summary", "description"];
+  const missing = fields.filter((field) => !String(body[field] || "").trim());
+  if (missing.length) return { error: "Please complete all required job fields." };
+  const toArray = (value) => Array.isArray(value) ? value.filter(Boolean) : String(value || "").split("\n").map((item) => item.trim()).filter(Boolean);
+  const value = { ...body, responsibilities: toArray(body.responsibilities), requirements: toArray(body.requirements) };
+  if (includeJobId) value.jobId = body.jobId.trim().toUpperCase();
+  else delete value.jobId;
+  return { value };
+}
+
+async function nextJobId() {
+  const latest = await Job.findOne({ jobId: /^INX-\d{5}$/ }).sort({ jobId: -1 }).select("jobId").lean();
+  const lastNumber = Number.parseInt(latest?.jobId?.slice(4) || "0", 10);
+  if (lastNumber >= 99999) throw new Error("Job ID limit reached.");
+  return `INX-${String(lastNumber + 1).padStart(5, "0")}`;
+}
+
+router.post("/jobs", async (req, res, next) => {
+  try { const payload = jobPayload(req.body); if (payload.error) return res.status(400).json({ message: payload.error }); let job; for (let attempt = 0; attempt < 3; attempt += 1) { try { job = await Job.create({ ...payload.value, jobId: await nextJobId() }); break; } catch (error) { if (error.code !== 11000 || attempt === 2) throw error; } } return res.status(201).json({ job }); } catch (error) { return next(error); }
+});
+router.patch("/jobs/:id", async (req, res, next) => {
+  try { const payload = jobPayload(req.body); if (payload.error) return res.status(400).json({ message: payload.error }); const job = await Job.findByIdAndUpdate(req.params.id, payload.value, { new: true, runValidators: true }); if (!job) return res.status(404).json({ message: "Job not found." }); return res.json({ job }); } catch (error) { return next(error); }
+});
+router.delete("/jobs/:id", async (req, res, next) => { try { const job = await Job.findByIdAndDelete(req.params.id); if (!job) return res.status(404).json({ message: "Job not found." }); return res.json({ message: "Job deleted." }); } catch (error) { return next(error); } });
+router.patch("/applications/:id/status", async (req, res, next) => { try { const application = await JobApplication.findByIdAndUpdate(req.params.id, { status: req.body.status }, { new: true, runValidators: true }); if (!application) return res.status(404).json({ message: "Application not found." }); return res.json({ application }); } catch (error) { return next(error); } });
 
 router.post("/users", async (req, res, next) => {
   if (!canManageUsers(req.adminUser)) {
