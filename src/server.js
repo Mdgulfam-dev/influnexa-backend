@@ -46,7 +46,7 @@ app.use(express.json({ limit: "1mb" }));
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "influnexa-backend" });
 });
-
+//api routes
 app.use("/api/registrations", registrationsRouter);
 app.use("/api/blogs", blogsRouter);
 app.use("/api/testimonials", testimonialsRouter);
