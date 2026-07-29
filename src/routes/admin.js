@@ -199,6 +199,10 @@ router.get("/dashboard", async (req, res, next) => {
       applications,
       applicationTotal,
       applicationCount,
+      brandStatusBreakdown,
+      influencerStatusBreakdown,
+      jobStatusBreakdown,
+      applicationStatusBreakdown,
     ] = await Promise.all([
       BrandRegistration.find(brandFilter).sort({ createdAt: -1 }).skip(brandPage.skip).limit(brandPage.limit).lean(),
       Object.keys(brandFilter).length ? BrandRegistration.countDocuments(brandFilter) : BrandRegistration.estimatedDocumentCount(),
@@ -215,6 +219,10 @@ router.get("/dashboard", async (req, res, next) => {
       JobApplication.find(candidateFilter).sort({ createdAt: -1 }).skip(candidatePage.skip).limit(candidatePage.limit).lean(),
       Object.keys(candidateFilter).length ? JobApplication.countDocuments(candidateFilter) : JobApplication.estimatedDocumentCount(),
       JobApplication.estimatedDocumentCount(),
+      BrandRegistration.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+      InfluencerRegistration.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+      Job.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+      JobApplication.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
     ]);
 
     res.json({
@@ -244,6 +252,12 @@ router.get("/dashboard", async (req, res, next) => {
       users: users.map(publicUser),
       jobs,
       applications,
+      analytics: {
+        brandStatuses: brandStatusBreakdown,
+        influencerStatuses: influencerStatusBreakdown,
+        jobStatuses: jobStatusBreakdown,
+        applicationStatuses: applicationStatusBreakdown,
+      },
       currentUser: req.adminUser?._id ? publicUser(req.adminUser) : req.adminUser,
     });
   } catch (error) {
