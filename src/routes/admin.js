@@ -6,6 +6,7 @@ import InfluencerRegistration from "../models/InfluencerRegistration.js";
 import Testimonial from "../models/Testimonial.js";
 import Job from "../models/Job.js";
 import JobApplication from "../models/JobApplication.js";
+import BrandTicket, { ticketStatuses } from "../models/BrandTicket.js";
 import { sendApplicationStatusEmail } from "../services/sendgrid.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 
@@ -199,6 +200,12 @@ router.get("/dashboard", async (req, res, next) => {
       applications,
       applicationTotal,
       applicationCount,
+      brandStatusBreakdown,
+      influencerStatusBreakdown,
+      jobStatusBreakdown,
+      applicationStatusBreakdown,
+      tickets,
+      ticketStatusBreakdown,
     ] = await Promise.all([
       BrandRegistration.find(brandFilter).sort({ createdAt: -1 }).skip(brandPage.skip).limit(brandPage.limit).lean(),
       Object.keys(brandFilter).length ? BrandRegistration.countDocuments(brandFilter) : BrandRegistration.estimatedDocumentCount(),
@@ -215,6 +222,12 @@ router.get("/dashboard", async (req, res, next) => {
       JobApplication.find(candidateFilter).sort({ createdAt: -1 }).skip(candidatePage.skip).limit(candidatePage.limit).lean(),
       Object.keys(candidateFilter).length ? JobApplication.countDocuments(candidateFilter) : JobApplication.estimatedDocumentCount(),
       JobApplication.estimatedDocumentCount(),
+      BrandRegistration.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+      InfluencerRegistration.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+      Job.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+      JobApplication.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+      BrandTicket.find().sort({ updatedAt: -1 }).limit(200).lean(),
+      BrandTicket.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
     ]);
 
     res.json({
@@ -231,6 +244,8 @@ router.get("/dashboard", async (req, res, next) => {
         newInfluencers: newInfluencerCount,
         publishedBlogs: blogs.filter((blog) => blog.status === "published").length,
         pendingTestimonials: testimonials.filter((testimonial) => testimonial.status === "pending").length,
+        tickets: tickets.length,
+        activeTickets: tickets.filter((ticket) => ticket.status === "Active").length,
       },
       pagination: {
         brands: pageMeta(brandPage, brandTotal),
@@ -244,11 +259,65 @@ router.get("/dashboard", async (req, res, next) => {
       users: users.map(publicUser),
       jobs,
       applications,
+      tickets,
+      analytics: {
+        brandStatuses: brandStatusBreakdown,
+        influencerStatuses: influencerStatusBreakdown,
+        jobStatuses: jobStatusBreakdown,
+        applicationStatuses: applicationStatusBreakdown,
+        ticketStatuses: ticketStatusBreakdown,
+      },
       currentUser: req.adminUser?._id ? publicUser(req.adminUser) : req.adminUser,
     });
   } catch (error) {
     next(error);
   }
+});
+
+function ticketPayload(body) {
+  const required = ["brandName", "campaignName"];
+  if (required.some((field) => !String(body[field] || "").trim())) {
+    return { error: "Brand name and campaign name are required." };
+  }
+  const number = (value) => Math.max(Number(value) || 0, 0);
+  const metrics = body.metrics || {};
+  return {
+    value: {
+      brandName: String(body.brandName).trim(), campaignName: String(body.campaignName).trim(),
+      contactName: String(body.contactName || "").trim(), contactEmail: String(body.contactEmail || "").trim(),
+      objective: String(body.objective || "").trim(), platforms: Array.isArray(body.platforms) ? body.platforms.filter(Boolean) : String(body.platforms || "").split(",").map((item) => item.trim()).filter(Boolean),
+      startDate: body.startDate || undefined, endDate: body.endDate || undefined, budget: number(body.budget),
+      currency: String(body.currency || "USD").trim(), status: ticketStatuses.includes(body.status) ? body.status : "Draft",
+      notes: String(body.notes || "").trim(),
+      metrics: Object.fromEntries(["creators", "posts", "reach", "impressions", "engagements", "clicks", "conversions", "spend"].map((key) => [key, number(metrics[key])])),
+    },
+  };
+}
+
+async function nextTicketNumber() {
+  const latest = await BrandTicket.findOne({ ticketNumber: /^BT-\d{5}$/ }).sort({ ticketNumber: -1 }).select("ticketNumber").lean();
+  return `BT-${String((Number.parseInt(latest?.ticketNumber?.slice(3) || "0", 10) + 1)).padStart(5, "0")}`;
+}
+
+router.post("/brand-tickets", async (req, res, next) => {
+  try {
+    const payload = ticketPayload(req.body); if (payload.error) return res.status(400).json({ message: payload.error });
+    const ticket = await BrandTicket.create({ ...payload.value, ticketNumber: await nextTicketNumber() });
+    return res.status(201).json({ ticket });
+  } catch (error) { return next(error); }
+});
+
+router.patch("/brand-tickets/:id", async (req, res, next) => {
+  try {
+    const payload = ticketPayload(req.body); if (payload.error) return res.status(400).json({ message: payload.error });
+    const ticket = await BrandTicket.findByIdAndUpdate(req.params.id, payload.value, { new: true, runValidators: true });
+    if (!ticket) return res.status(404).json({ message: "Brand ticket not found." });
+    return res.json({ ticket });
+  } catch (error) { return next(error); }
+});
+
+router.delete("/brand-tickets/:id", async (req, res, next) => {
+  try { const ticket = await BrandTicket.findByIdAndDelete(req.params.id); if (!ticket) return res.status(404).json({ message: "Brand ticket not found." }); return res.json({ message: "Brand ticket deleted." }); } catch (error) { return next(error); }
 });
 
 function jobPayload(body, { includeJobId = false } = {}) {
