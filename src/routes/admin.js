@@ -20,10 +20,46 @@ function escapeRegex(value = "") {
 
 function paginationFromQuery(query, prefix) {
   const page = Math.max(Number.parseInt(query[`${prefix}Page`], 10) || 1, 1);
-  const requestedLimit = Number.parseInt(query[`${prefix}Limit`], 10) || 25;
+  const requestedLimit = Number.parseInt(query[`${prefix}Limit`] || query.limit, 10) || 25;
   const limit = Math.min(Math.max(requestedLimit, 10), MAX_REGISTRATION_PAGE_SIZE);
 
   return { limit, page, skip: (page - 1) * limit };
+}
+
+function decodeCursor(value) {
+  if (!value) return null;
+  try {
+    const { createdAt, id } = JSON.parse(Buffer.from(String(value), "base64url").toString("utf8"));
+    if (!createdAt || !id || Number.isNaN(new Date(createdAt).getTime())) return null;
+    return { createdAt: new Date(createdAt), id };
+  } catch {
+    return null;
+  }
+}
+
+function encodeCursor(record) {
+  return Buffer.from(JSON.stringify({ createdAt: record.createdAt, id: String(record._id) })).toString("base64url");
+}
+
+function dateRangeFilter(query, field = "createdAt") {
+  const range = {};
+  if (query.from) {
+    const from = new Date(query.from);
+    if (!Number.isNaN(from.getTime())) range.$gte = from;
+  }
+  if (query.to) {
+    const to = new Date(query.to);
+    if (!Number.isNaN(to.getTime())) {
+      to.setHours(23, 59, 59, 999);
+      range.$lte = to;
+    }
+  }
+  return Object.keys(range).length ? { [field]: range } : {};
+}
+
+function valuesFilter(value, field) {
+  const values = String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
+  return values.length ? { [field]: { $in: values } } : {};
 }
 
 function buildSearchFilter(search, fields) {
@@ -142,6 +178,52 @@ router.post("/login", async (req, res, next) => {
 });
 
 router.use(requireAdmin);
+
+function registrationFilter(query, type) {
+  const isBrand = type === "brands";
+  const aliases = isBrand
+    ? { New: ["New", "new"], Contacted: ["Contacted", "contacted"], "Under Review": ["Under Review", "qualified"], Closed: ["Closed", "closed"] }
+    : {};
+  const facets = isBrand
+    ? { ...valuesFilter(query.country, "country"), ...valuesFilter(query.industry, "industry") }
+    : { ...valuesFilter(query.country, "country"), ...valuesFilter(query.platform, "primaryPlatform"), ...valuesFilter(query.category, "categories") };
+
+  return {
+    // Text indexes keep broad registration searches off the full collection scan.
+    ...(String(query.search || "").trim() ? { $text: { $search: String(query.search).trim() } } : {}),
+    ...buildStatusFilter(query.status, aliases),
+    ...facets,
+    ...dateRangeFilter(query),
+  };
+}
+
+router.get("/registrations/:type", async (req, res, next) => {
+  const { type } = req.params;
+  if (!["brands", "influencers"].includes(type)) return res.status(404).json({ message: "Registration type not found." });
+
+  try {
+    const Model = type === "brands" ? BrandRegistration : InfluencerRegistration;
+    const filter = registrationFilter(req.query, type);
+    const { limit } = paginationFromQuery(req.query, "");
+    const cursor = decodeCursor(req.query.after);
+    if (cursor) {
+      filter.$and = [...(filter.$and || []), { $or: [
+        { createdAt: { $lt: cursor.createdAt } },
+        { createdAt: cursor.createdAt, _id: { $lt: cursor.id } },
+      ] }];
+    }
+
+    const records = await Model.find(filter).sort({ createdAt: -1, _id: -1 }).limit(limit + 1).lean();
+    const hasMore = records.length > limit;
+    const items = hasMore ? records.slice(0, limit) : records;
+    res.json({
+      items,
+      pagination: { limit, hasMore, nextCursor: hasMore ? encodeCursor(items[items.length - 1]) : null },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get("/dashboard", async (req, res, next) => {
   try {
