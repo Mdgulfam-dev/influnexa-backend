@@ -62,6 +62,15 @@ function valuesFilter(value, field) {
   return values.length ? { [field]: { $in: values } } : {};
 }
 
+function numericRangeFilter(minValue, maxValue, field) {
+  const range = {};
+  const min = Number(minValue);
+  const max = Number(maxValue);
+  if (Number.isFinite(min) && min >= 0) range.$gte = min;
+  if (Number.isFinite(max) && max >= 0) range.$lte = max;
+  return Object.keys(range).length ? { [field]: range } : {};
+}
+
 function buildSearchFilter(search, fields) {
   const trimmedSearch = String(search || "").trim();
 
@@ -186,7 +195,15 @@ function registrationFilter(query, type) {
     : {};
   const facets = isBrand
     ? { ...valuesFilter(query.country, "country"), ...valuesFilter(query.industry, "industry") }
-    : { ...valuesFilter(query.country, "country"), ...valuesFilter(query.platform, "primaryPlatform"), ...valuesFilter(query.category, "categories") };
+    : {
+      ...valuesFilter(query.country, "country"),
+      ...valuesFilter(query.state, "state"),
+      ...valuesFilter(query.location, "city"),
+      ...valuesFilter(query.platform, "primaryPlatform"),
+      ...valuesFilter(query.category, "categories"),
+      ...valuesFilter(String(query.language || "").toLowerCase(), "languageTags"),
+      ...numericRangeFilter(query.followerMin, query.followerMax, "followerCount"),
+    };
 
   return {
     // Text indexes keep broad registration searches off the full collection scan.

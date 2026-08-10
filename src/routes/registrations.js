@@ -58,6 +58,17 @@ function normalizeProfile(value) {
   return normalizeText(value).replace(/\/+$/, "").toLowerCase();
 }
 
+function normalizeLanguageTags(value) {
+  return normalizeText(value).split(",").map((language) => language.trim().toLowerCase()).filter(Boolean);
+}
+
+function parseFollowerCount(value) {
+  const match = normalizeText(value).toLowerCase().replace(/,/g, "").match(/([\d.]+)\s*(k|m|million|b|billion)?/);
+  if (!match) return undefined;
+  const multiplier = { k: 1_000, m: 1_000_000, million: 1_000_000, b: 1_000_000_000, billion: 1_000_000_000 }[match[2]] || 1;
+  return Math.round(Number(match[1]) * multiplier);
+}
+
 function exactCaseInsensitive(value) {
   const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`^${escapedValue}$`, "i");
@@ -152,6 +163,8 @@ router.post("/influencers", async (req, res, next) => {
       primaryProfile,
       categories: normalizeArray(req.body.categories),
       contentTypes: normalizeArray(req.body.contentTypes),
+      languageTags: normalizeLanguageTags(req.body.languages),
+      followerCount: parseFollowerCount(req.body.followers),
     });
 
     return res.status(201).json({

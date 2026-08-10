@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "backfill:influencer-filters": "node src/scripts/backfillInfluencerFilterFields.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
