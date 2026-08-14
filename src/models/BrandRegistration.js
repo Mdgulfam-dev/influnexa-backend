@@ -4,8 +4,9 @@ export const brandStatuses = [
   "New",
   "Under Review",
   "Contacted",
-  "Follow-up 1",
-  "Follow-up 2",
+  "Followup-1",
+  "Followup-2",
+  "Followup-3",
   "Meeting Scheduled",
   "Requirement Received",
   "Proposal Sent",
@@ -55,6 +56,11 @@ const brandRegistrationSchema = new mongoose.Schema(
 );
 
 brandRegistrationSchema.index({ status: 1, createdAt: -1 });
+brandRegistrationSchema.index({ createdAt: -1, _id: -1 });
+brandRegistrationSchema.index({ country: 1, createdAt: -1 });
+brandRegistrationSchema.index({ industry: 1, createdAt: -1 });
+brandRegistrationSchema.index({ status: 1, country: 1, createdAt: -1 });
+brandRegistrationSchema.index({ status: 1, industry: 1, createdAt: -1 });
 brandRegistrationSchema.index({ companyName: 1 });
 brandRegistrationSchema.index({
   companyName: "text",

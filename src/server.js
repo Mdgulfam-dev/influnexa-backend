@@ -1,6 +1,8 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import http from "http";
+import { Server } from "socket.io";
 import { connectDatabase } from "./config/db.js";
 import adminRouter from "./routes/admin.js";
 import blogsRouter from "./routes/blogs.js";
@@ -8,11 +10,27 @@ import registrationsRouter from "./routes/registrations.js";
 import testimonialsRouter from "./routes/testimonials.js";
 import jobApplicationsRouter from "./routes/jobApplications.js";
 import jobsRouter from "./routes/jobs.js";
-
+import csvCreatorsRouter  from "./routes/csvRoutes.js"
+import csvBrandRoutes from "./routes/csvBrandRoutes.js"
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5001;
+const server = http.createServer(app);
+export const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  },
+});
+io.on("connection", (socket) => {
+  console.log("Socket connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("Socket disconnected:", socket.id);
+  });
+});
+
 const clientOrigins = (process.env.CLIENT_ORIGIN || "http://127.0.0.1:5174")
   .split(",")
   .map((origin) => origin.trim())
@@ -53,7 +71,11 @@ app.use("/api/testimonials", testimonialsRouter);
 app.use("/api/job-applications", jobApplicationsRouter);
 app.use("/api/jobs", jobsRouter);
 app.use("/api/admin", adminRouter);
-
+app.use("/api/csv-creators", csvCreatorsRouter);
+app.use(
+  "/api/csv-brands",
+  csvBrandRoutes
+);
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
