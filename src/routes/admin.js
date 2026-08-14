@@ -9,7 +9,7 @@ import JobApplication from "../models/JobApplication.js";
 import BrandTicket, { ticketStatuses } from "../models/BrandTicket.js";
 import { sendApplicationStatusEmail } from "../services/sendgrid.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
-
+import CSVUploadReport from "../models/CSVUploadReport.js";
 const router = express.Router();
 
 const MAX_REGISTRATION_PAGE_SIZE = 100;
@@ -282,7 +282,7 @@ router.get("/dashboard", async (req, res, next) => {
       ...buildStatusFilter(req.query.candidateStatus),
       ...(String(req.query.candidateJobId || "").trim() ? { jobId: new RegExp(`^${escapeRegex(req.query.candidateJobId.trim())}$`, "i") } : {}),
     };
-
+// 
     const [
       brands,
       brandTotal,
@@ -292,6 +292,7 @@ router.get("/dashboard", async (req, res, next) => {
       influencerTotal,
       influencerCount,
       newInfluencerCount,
+      latestCSVReport,
       blogs,
       testimonials,
       users,
@@ -305,6 +306,7 @@ router.get("/dashboard", async (req, res, next) => {
       applicationStatusBreakdown,
       tickets,
       ticketStatusBreakdown,
+       
     ] = await Promise.all([
       BrandRegistration.find(brandFilter).sort({ createdAt: -1 }).skip(brandPage.skip).limit(brandPage.limit).lean(),
       Object.keys(brandFilter).length ? BrandRegistration.countDocuments(brandFilter) : BrandRegistration.estimatedDocumentCount(),
@@ -314,6 +316,9 @@ router.get("/dashboard", async (req, res, next) => {
       Object.keys(influencerFilter).length ? InfluencerRegistration.countDocuments(influencerFilter) : InfluencerRegistration.estimatedDocumentCount(),
       InfluencerRegistration.estimatedDocumentCount(),
       InfluencerRegistration.countDocuments({ status: "new" }),
+     CSVUploadReport.findOne()
+  .sort({ createdAt: -1 })
+  .lean(),
       BlogPost.find().sort({ publishedAt: -1, createdAt: -1 }).limit(200),
       Testimonial.find().sort({ createdAt: -1 }).limit(200),
       AdminUser.find().sort({ createdAt: -1 }).limit(200),
@@ -333,6 +338,7 @@ router.get("/dashboard", async (req, res, next) => {
       stats: {
         brands: brandCount,
         influencers: influencerCount,
+       csvRecords: latestCSVReport?.totalRecords || 0,
         blogs: blogs.length,
         testimonials: testimonials.length,
         users: users.length,
