@@ -89,8 +89,8 @@ export const uploadBrandsCSV = async (req, res) => {
             row["Full Name"]
           ),
 
-          prospects: cleanText(
-            row["ProsPects"]
+          designation: cleanText(
+            row["designation"]
           ),
 
           email: cleanEmail(
@@ -334,7 +334,7 @@ export const uploadBrandsCSV = async (req, res) => {
                     const compareFields = [
                       "companyName",
                       "fullName",
-                      "prospects",
+                      "designation",
                       "email",
                       "officialEmail",
                       "mobileNumber",
@@ -800,7 +800,7 @@ export const getCsvBrands = async (req, res) => {
     const {
       companyName,
       fullName,
-      prospects,
+      designation,
       email,
       officialEmail,
       mobileNumber,
@@ -848,18 +848,18 @@ export const getCsvBrands = async (req, res) => {
     }
 
     // ========================================
-    // PROSPECTS
+    // designation
     // ========================================
 
-    if (prospects) {
-  const selectedProspects = prospects
+    if (designation) {
+  const selecteddesignation = designation
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 
-  if (selectedProspects.length > 0) {
-    filter.prospects = {
-      $in: selectedProspects,
+  if (selecteddesignation.length > 0) {
+    filter.designation = {
+      $in: selecteddesignation,
     };
   }
 }
@@ -1192,12 +1192,12 @@ export const deleteAllCsvBrands = async (req, res) => {
 export const getCsvBrandFilterOptions = async (req, res) => {
   try {
     const [
-      prospects,
+      designation,
       ageOfCompany,
       dataType,
       status,
     ] = await Promise.all([
-      CsvBrand.distinct("prospects"),
+      CsvBrand.distinct("designation"),
       CsvBrand.distinct("ageOfCompany"),
       CsvBrand.distinct("dataType"),
       CsvBrand.distinct("status"),
@@ -1229,7 +1229,7 @@ export const getCsvBrandFilterOptions = async (req, res) => {
       success: true,
 
       data: {
-        prospects: cleanOptions(prospects),
+        designation: cleanOptions(designation),
         ageOfCompany: cleanOptions(ageOfCompany),
         dataType: cleanOptions(dataType),
         status: cleanOptions(status),

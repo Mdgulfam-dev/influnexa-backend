@@ -12,7 +12,7 @@ const csvBrandSchema = new mongoose.Schema(
       trim: true,
     },
 
-    prospects: {
+    designation: {
       type: String,
       trim: true,
     },

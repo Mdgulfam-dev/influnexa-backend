@@ -9,8 +9,8 @@ const testimonialSchema = new mongoose.Schema(
     rating: { type: Number, min: 1, max: 5, default: 5 },
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected"],
-      default: "pending",
+      enum: ["Pending", "Approved", "Rejected"],
+      default: "Pending",
     },
     approvedAt: { type: Date },
   },

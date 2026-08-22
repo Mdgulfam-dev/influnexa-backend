@@ -15,7 +15,7 @@ const influencerRegistrationSchema = new mongoose.Schema(
     primaryPlatform: { type: String, required: true, trim: true },
     primaryProfile: { type: String, required: true, trim: true, lowercase: true, unique: true },
     otherProfiles: { type: String, trim: true },
-    followers: { type: String, required: true, trim: true },
+    followers: { type: Number, required: true, min: 0 },
     followerCount: { type: Number, min: 0 },
     engagementRate: { type: String, trim: true },
     averageViews: { type: String, trim: true },

@@ -188,6 +188,26 @@ router.post("/login", async (req, res, next) => {
 
 router.use(requireAdmin);
 
+function followerRangeFilter(range) {
+  if (!range) return {};
+
+  const ranges = {
+    "Under 1K": { $lt: 1000 },
+    "1K - 10K": { $gte: 1000, $lte: 10000 },
+    "10K - 50K": { $gte: 10000, $lte: 50000 },
+    "50K - 100K": { $gte: 50000, $lte: 100000 },
+    "100K - 500K": { $gte: 100000, $lte: 500000 },
+    "500K - 1M": { $gte: 500000, $lte: 1000000 },
+    "1M - 5M": { $gte: 1000000, $lte: 5000000 },
+    "5M+": { $gte: 5000000 },
+  };
+
+  return ranges[range]
+    ? { followerCount: ranges[range] }
+    : {};
+}
+
+
 function registrationFilter(query, type) {
   const isBrand = type === "brands";
   const aliases = isBrand
@@ -203,6 +223,7 @@ function registrationFilter(query, type) {
       ...valuesFilter(query.category, "categories"),
       ...valuesFilter(String(query.language || "").toLowerCase(), "languageTags"),
       ...numericRangeFilter(query.followerMin, query.followerMax, "followerCount"),
+      ...followerRangeFilter(query.followerRange),
     };
 
   return {
@@ -334,16 +355,48 @@ router.get("/dashboard", async (req, res, next) => {
       BrandTicket.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
     ]);
 
+const latestJob = await Job.findOne()
+  .sort({ createdAt: -1 })
+  .select("createdAt")
+  .lean();
+
+const latestApplication = await JobApplication.findOne()
+  .sort({ createdAt: -1 })
+  .select("createdAt")
+  .lean();
+
+const latestInfluencer = await InfluencerRegistration.findOne()
+  .sort({ createdAt: -1, _id: -1 })
+  .select("createdAt _id")
+  .lean();
+
+const latestBrand = await BrandRegistration.findOne()
+  .sort({ createdAt: -1, _id: -1 })
+  .select("createdAt _id")
+  .lean();
+
+const latestTicket = await BrandTicket.findOne()
+  .sort({ createdAt: -1 })
+  .select("createdAt")
+  .lean();
+
+
     res.json({
       stats: {
         brands: brandCount,
+        latestBrandDate: latestBrand?.createdAt || null,
         influencers: influencerCount,
+        latestInfluencerDate: latestInfluencer?.createdAt || null,
        csvRecords: latestCSVReport?.totalRecords || 0,
+         latestCsvUploadDate: latestCSVReport?.createdAt || null,
+       latestCsvUploadDate: latestCSVReport?.createdAt || null,
         blogs: blogs.length,
         testimonials: testimonials.length,
         users: users.length,
         jobs: jobs.length,
+        latestJobDate: latestJob?.createdAt || null,
         applications: applicationCount,
+         latestApplicationDate: latestApplication?.createdAt || null,
         reviewApplications: await JobApplication.countDocuments({ status: "Review" }),
         newBrands: newBrandCount,
         newInfluencers: newInfluencerCount,
@@ -351,6 +404,7 @@ router.get("/dashboard", async (req, res, next) => {
         pendingTestimonials: testimonials.filter((testimonial) => testimonial.status === "pending").length,
         tickets: tickets.length,
         activeTickets: tickets.filter((ticket) => ticket.status === "Active").length,
+         latestTicketDate: latestTicket?.createdAt || null,
       },
       pagination: {
         brands: pageMeta(brandPage, brandTotal),
