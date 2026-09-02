@@ -17,10 +17,27 @@ const requiredBrandFields = [
 ];
 
 const requiredInfluencerFields = [
-   "fullName",
+   // Step 1 - Basic Details
+  "fullName",
   "email",
+  "phoneNumber",
+  "dateOfBirth",
+
+  // Step 2 - Address
+  "fullAddress",
+  "city",
+  "state",
+  "pincode",
   "country",
-   "consentToContact"
+
+  // Step 3 - Profile
+  "categories",
+
+  // Step 4 - Platforms
+  "whatAllPlatformsAreYouAvailableOn",
+
+  // Step 5 - Deals
+  "campaignType",
 ];
 
 function missingFields(body, fields) {
