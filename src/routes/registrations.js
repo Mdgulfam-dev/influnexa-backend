@@ -163,13 +163,13 @@ router.post("/influencers", async (req, res, next) => {
       }
     }
 
-    if (missing.length > 0) {
-      return res.status(400).json({
-        message:
-          "Please complete all required influencer fields.",
-        missing,
-      });
-    }
+    // if (missing.length > 0) {
+    //   return res.status(400).json({
+    //     message:
+    //       "Please complete all required influencer fields.",
+    //     missing,
+    //   });
+    // }
 
     const email = normalizeEmail(body.email);
 
