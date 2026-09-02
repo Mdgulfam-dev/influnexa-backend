@@ -215,29 +215,18 @@ const csvCreatorSchema = new mongoose.Schema(
       default: 0,
     },
 
-    fetchedFromBrandPage: {
-      type: String,
-      default: "",
-    },
-
-    fetchedForBrand: {
-      type: String,
-      default: "",
-    },
 
     platform: {
       type: String,
       default: "",
     },
 
-    fetchedDate: {
-      type: String,
-      default: "",
-    },
+    
 
     InflunexaUserId: {
       type: Number,
-      default: 0,
+        unique: true,
+  sparse: true,
     },
 
     editStatus: {
@@ -258,6 +247,7 @@ const csvCreatorSchema = new mongoose.Schema(
   {
     timestamps: true,
   }
+  
 );
 
 const CsvCreator =

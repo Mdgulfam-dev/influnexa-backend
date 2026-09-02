@@ -17,20 +17,6 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5001;
 const server = http.createServer(app);
-export const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE"],
-  },
-});
-io.on("connection", (socket) => {
-  console.log("Socket connected:", socket.id);
-
-  socket.on("disconnect", () => {
-    console.log("Socket disconnected:", socket.id);
-  });
-});
-
 const clientOrigins = (process.env.CLIENT_ORIGIN || "http://127.0.0.1:5174")
   .split(",")
   .map((origin) => origin.trim())
@@ -47,6 +33,21 @@ function isAllowedOrigin(origin) {
     vercelClientPattern.test(origin)
   );
 }
+export const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  },
+});
+io.on("connection", (socket) => {
+  console.log("Socket connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("Socket disconnected:", socket.id);
+  });
+});
+
+
 
 app.use(
   cors({
@@ -89,7 +90,7 @@ app.use((error, req, res, next) => {
 
 connectDatabase()
   .then(() => {
-    app.listen(port, () => {
+    server.listen(port, () => {
       console.log(`Influnexa API running on http://127.0.0.1:${port}`);
     });
   })

@@ -11,7 +11,26 @@ import { sendApplicationStatusEmail } from "../services/sendgrid.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import CSVUploadReport from "../models/CSVUploadReport.js";
 const router = express.Router();
+const generateInfluencerCode = async () => {
+  const lastInfluencer = await InfluencerRegistration.findOne({
+    InflunexaUserId: { $regex: /^\d+$/ },
+  })
+    .sort({ InflunexaUserId: -1 })
+    .select("InflunexaUserId")
+    .lean();
 
+  let nextCode = 100001;
+
+  if (lastInfluencer?.InflunexaUserId) {
+    const lastCode = Number(lastInfluencer.InflunexaUserId);
+
+    if (Number.isFinite(lastCode)) {
+      nextCode = lastCode + 1;
+    }
+  }
+
+  return String(nextCode);
+};
 const MAX_REGISTRATION_PAGE_SIZE = 100;
 
 function escapeRegex(value = "") {
@@ -706,6 +725,7 @@ router.patch("/brands/:id/status", async (req, res, next) => {
 
 router.patch("/influencers/:id/status", async (req, res, next) => {
   try {
+    
     const influencer = await InfluencerRegistration.findByIdAndUpdate(
       req.params.id,
       { status: req.body.status },

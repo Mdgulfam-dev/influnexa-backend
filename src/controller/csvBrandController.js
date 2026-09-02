@@ -482,6 +482,7 @@ export const uploadBrandsCSV = async (req, res) => {
                   // ========================================
 
                   else {
+                    
                     await CsvBrand.create(
                       brand
                     );
@@ -972,25 +973,58 @@ if (ageOfCompany) {
       };
     }
 
-    // ========================================
-    // DATA TYPE
-    // ========================================
-
-    // ========================================
-// DATA TYPE - MULTI SELECT
+// ========================================
+// DATA TYPE FILTER
+// ========================================
+// ========================================
+// DATA TYPE FILTER
 // ========================================
 
 if (dataType) {
-  const selectedDataTypes = dataType
+  const selectedTypes = dataType
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 
-  if (selectedDataTypes.length > 0) {
-    filter.dataType = {
-      $in: selectedDataTypes,
+  const hasLinkedIn = selectedTypes.includes("LinkedIn");
+  const hasBrand = selectedTypes.includes("Brand");
+
+  // LinkedIn selected only
+  if (hasLinkedIn && !hasBrand) {
+    filter.linkedinProfile = {
+      $exists: true,
+      $type: "string",
+      $regex: /\S/,
     };
   }
+
+  // Brand selected only
+  else if (hasBrand && !hasLinkedIn) {
+    filter.$and = [
+      ...(filter.$and || []),
+      {
+        $or: [
+          {
+            linkedinProfile: {
+              $exists: false,
+            },
+          },
+          {
+            linkedinProfile: null,
+          },
+          {
+            linkedinProfile: "",
+          },
+          {
+            linkedinProfile: {
+              $regex: /^\s*$/,
+            },
+          },
+        ],
+      },
+    ];
+  }
+
 }
     // ========================================
     // STATUS

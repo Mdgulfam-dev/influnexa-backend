@@ -17,14 +17,9 @@ const requiredBrandFields = [
 ];
 
 const requiredInfluencerFields = [
-  "fullName",
-  "creatorName",
+   "fullName",
   "email",
   "country",
-  "languages",
-  "primaryPlatform",
-  "primaryProfile",
-  "followers",
 ];
 
 function missingFields(body, fields) {
@@ -128,52 +123,254 @@ router.post("/brands", async (req, res, next) => {
 
 router.post("/influencers", async (req, res, next) => {
   try {
-    const missing = missingFields(req.body, requiredInfluencerFields);
+    const body = req.body || {};
 
-    if (req.body.consentToContact !== true) {
-      missing.push("consentToContact");
+    const missing = missingFields(
+      body,
+      requiredInfluencerFields
+    );
+
+    if (body.consentToContact !== true) {
+      if (!missing.includes("consentToContact")) {
+        missing.push("consentToContact");
+      }
     }
 
     if (missing.length > 0) {
       return res.status(400).json({
-        message: "Please complete all required influencer fields.",
+        message:
+          "Please complete all required influencer fields.",
         missing,
       });
     }
 
-    const email = normalizeEmail(req.body.email);
-    const primaryProfile = normalizeProfile(req.body.primaryProfile);
-    const existingRegistration = await InfluencerRegistration.exists({
-      $or: [
-        { email },
-        { primaryProfile: exactCaseInsensitive(primaryProfile) },
-      ],
-    });
+    const email = normalizeEmail(body.email);
+
+    const existingRegistration =
+      await InfluencerRegistration.exists({
+        email,
+      });
 
     if (existingRegistration) {
       return duplicateRegistrationResponse(
         res,
-        "An influencer profile with this email or social profile already exists. Please contact our team if you need to update your details."
+        "An influencer profile with this email already exists. Please contact our team if you need to update your details."
       );
     }
 
-    const registration = await InfluencerRegistration.create({
-      ...req.body,
-      email,
-      primaryProfile,
-      categories: normalizeArray(req.body.categories),
-      contentTypes: normalizeArray(req.body.contentTypes),
-      languageTags: normalizeLanguageTags(req.body.languages),
-      followerCount: parseFollowerCount(req.body.followers),
-    });
+    const toNumber = (value) => {
+      if (
+        value === "" ||
+        value === null ||
+        value === undefined
+      ) {
+        return 0;
+      }
+
+      const number = Number(value);
+
+      return Number.isFinite(number)
+        ? number
+        : 0;
+    };
+
+    const registration =
+      await InfluencerRegistration.create({
+
+        // =====================================
+        // BASIC INFORMATION
+        // =====================================
+        fullName: normalizeText(body.fullName),
+
+        instagramUsername:
+          normalizeText(body.instagramUsername),
+
+        instagramProfileLink:
+          normalizeText(body.instagramProfileLink),
+
+        instagramFollowersRange:
+          normalizeText(
+            body.instagramFollowersRange
+          ),
+
+        exactFollowers:
+          toNumber(body.exactFollowers),
+
+        // =====================================
+        // CONTACT
+        // =====================================
+        phoneNumber:
+          normalizeText(body.phoneNumber),
+
+        whatsappNumber:
+          normalizeText(body.whatsappNumber),
+
+        email,
+
+        // =====================================
+        // CATEGORIES
+        // =====================================
+        categories:
+          normalizeArray(body.categories),
+
+        campaignType:
+          normalizeArray(body.campaignType),
+
+        influencerType:
+          normalizeText(body.influencerType),
+
+        // =====================================
+        // PERSONAL
+        // =====================================
+        gender:
+          normalizeText(body.gender),
+
+        dateOfBirth:
+          normalizeText(body.dateOfBirth),
+
+        languages:
+          normalizeArray(body.languages),
+
+        // =====================================
+        // ADDRESS
+        // =====================================
+        fullAddress:
+          normalizeText(body.fullAddress),
+
+        landmark:
+          normalizeText(body.landmark),
+
+        city:
+          normalizeText(body.city),
+
+        state:
+          normalizeText(body.state),
+
+        country:
+          normalizeText(body.country),
+
+        pincode:
+          normalizeText(body.pincode),
+
+        // =====================================
+        // YOUTUBE
+        // =====================================
+        youtubeUsername:
+          normalizeText(body.youtubeUsername),
+
+        youtubeChannelLink:
+          normalizeText(
+            body.youtubeChannelLink
+          ),
+
+        youtubeSubscribersRange:
+          normalizeText(
+            body.youtubeSubscribersRange
+          ),
+
+        // =====================================
+        // COMMERCIALS
+        // =====================================
+        commercialsFor1InstagramReel:
+          toNumber(
+            body.commercialsFor1InstagramReel
+          ),
+
+        photoLink:
+          normalizeText(body.photoLink),
+
+        commercialsFor1InstagramStory:
+          toNumber(
+            body.commercialsFor1InstagramStory
+          ),
+
+        commercialsFor1InstagramPost:
+          toNumber(
+            body.commercialsFor1InstagramPost
+          ),
+
+        commercialsFor1DedicatedYouTubeVideo:
+          toNumber(
+            body.commercialsFor1DedicatedYouTubeVideo
+          ),
+
+        commercialsFor1IntegratedYouTubeVideo:
+          toNumber(
+            body.commercialsFor1IntegratedYouTubeVideo
+          ),
+
+        commercialsFor1DedicatedYouTubeShortsVideo:
+          toNumber(
+            body.commercialsFor1DedicatedYouTubeShortsVideo
+          ),
+
+        commercialsFor1IntegratedYouTubeShortsVideo:
+          toNumber(
+            body.commercialsFor1IntegratedYouTubeShortsVideo
+          ),
+
+        // =====================================
+        // OTHER INFORMATION
+        // =====================================
+        whatKindOfDealDoYouParticipateIn:
+          normalizeText(
+            body.whatKindOfDealDoYouParticipateIn
+          ),
+
+        speakingVideoLink:
+          normalizeText(
+            body.speakingVideoLink
+          ),
+
+        areYouATvMoviesOttCelebrity:
+          normalizeText(
+            body.areYouATvMoviesOttCelebrity
+          ),
+
+        whatAllPlatformsAreYouAvailableOn:
+          normalizeArray(
+            body.whatAllPlatformsAreYouAvailableOn
+          ),
+
+        typeOfCeleb:
+          normalizeText(body.typeOfCeleb),
+
+        howManyAmazonReviewsYouDoPerMonth:
+          toNumber(
+            body.howManyAmazonReviewsYouDoPerMonth
+          ),
+
+        platform:
+          normalizeText(body.platform),
+
+        timestamp:
+          normalizeText(body.timestamp),
+
+        bio:
+          normalizeText(body.bio),
+
+        consentToContact:
+          body.consentToContact === true,
+      });
 
     return res.status(201).json({
-      message: "Influencer registration saved successfully.",
+      message:
+        "Influencer registration saved successfully.",
       id: registration._id,
     });
+
   } catch (error) {
+
+    console.error(
+      "Influencer registration error:",
+      error
+    );
+
     if (error?.code === 11000) {
-      return duplicateRegistrationResponse(res, "An influencer profile with this email or social profile already exists.");
+      return duplicateRegistrationResponse(
+        res,
+        "An influencer profile with this email already exists."
+      );
     }
 
     return next(error);

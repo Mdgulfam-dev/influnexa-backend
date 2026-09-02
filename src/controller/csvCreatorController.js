@@ -118,6 +118,72 @@ const getInfluencerType = (followers) => {
 
   return "Nano Influencer";
 };
+
+const normalizeYoutubeSubscribersRange = (value) => {
+  if (!value) return "";
+
+  const text = String(value).trim().toUpperCase();
+
+  const convertToNumber = (val) => {
+    val = val.replace(/,/g, "").trim();
+
+    if (val.endsWith("K")) {
+      return parseFloat(val.replace("K", "")) * 1000;
+    }
+
+    if (val.endsWith("M")) {
+      return parseFloat(val.replace("M", "")) * 1000000;
+    }
+
+    return parseFloat(val);
+  };
+
+  // Handle 10K - 50K type values
+  if (text.includes("-")) {
+    const [minValue] = text.split("-");
+
+    const min = convertToNumber(minValue);
+
+    if (min < 1000) return "Under 1K";
+    if (min < 10000) return "1K - 10K";
+    if (min < 50000) return "10K - 50K";
+    if (min < 100000) return "50K - 100K";
+
+    return "100K+";
+  }
+
+  // Handle 100K+
+  if (text.includes("+")) {
+    return "100K+";
+  }
+
+  // Handle 10.6K, 10.8K, 103, 10K etc.
+  const number = convertToNumber(text);
+
+  if (isNaN(number)) return "";
+
+  if (number < 1000) return "Under 1K";
+  if (number < 10000) return "1K - 10K";
+  if (number < 50000) return "10K - 50K";
+  if (number < 100000) return "50K - 100K";
+
+  return "100K+";
+};
+
+const generateInflunexaUserId = async () => {
+  let userId;
+  let exists = true;
+
+  while (exists) {
+    userId = Math.floor(100000 + Math.random() * 900000);
+
+    exists = await CsvCreator.exists({
+      InflunexaUserId: userId,
+    });
+  }
+
+  return userId;
+};
 // ==========================
 // UPLOAD CSV
 // ==========================
@@ -234,8 +300,8 @@ const instagramFollowersRange =
           youtubeChannelLink:
             row["YouTube Channel Link"] || "",
 
-          youtubeSubscribersRange:
-            row["YouTube Subscribers Range"] || "",
+          youtubeSubscribersRange:  normalizeYoutubeSubscribersRange
+           ( row["YouTube Subscribers Range"] || ""),
 
           commercialsFor1InstagramReel:
             Number(row["Commercials For 1 Instagram Reel"]) || 0,
@@ -292,19 +358,13 @@ const instagramFollowersRange =
               row["How many Amazon reviews you do per month"]
             ) || 0,
 
-          fetchedFromBrandPage:
-            row["Fetched from Brand Page"] || "",
-
-          fetchedForBrand:
-            row["Fetched For Brand"] || "",
+        
 
           platform:
             row["Platform"] || "",
 
-          fetchedDate:
-            row["Fetched Date"] || "",
 
-          InflunexaUserId: Number(row["InflunexaUserId"]) || null,
+          InflunexaUserId:null,
 
         });
       })
@@ -474,39 +534,71 @@ let changedFields=[];
 
 
 const compareFields=[
+  "instagramUsername",
+  "instagramProfileLink",
+  "instagramFollowersRange",
+  "exactFollowers",
 
+  "categories",
 
-"fullName",
+  "phoneNumber",
+  "whatsappNumber",
 
-"email",
+  "fullName",
+  "email",
 
-"phoneNumber",
+  "gender",
+  "dateOfBirth",
+  "influencerType",
 
-"whatsappNumber",
+  "campaignType",
 
-"instagramUsername",
+  "whatKindOfDealDoYouParticipateIn",
 
-"instagramProfileLink",
+  "languages",
 
-"instagramFollowersRange",
+  "speakingVideoLink",
 
-"exactFollowers",
+  "fullAddress",
+  "landmark",
+  "city",
+  "state",
+  "country",
+  "pincode",
 
-"categories",
-"youtubeUsername",
+  "photoLink",
 
-"youtubeChannelLink",
+  "youtubeUsername",
+  "youtubeChannelLink",
+  "youtubeSubscribersRange",
 
-"youtubeSubscribersRange",
+  "commercialsFor1InstagramReel",
+  "commercialsFor1InstagramStory",
+  "commercialsFor1InstagramPost",
 
-"city",
+  "commercialsFor1DedicatedYouTubeVideo",
+  "commercialsFor1IntegratedYouTubeVideo",
 
-"state",
+  "commercialsFor1DedicatedYouTubeShortsVideo",
+  "commercialsFor1IntegratedYouTubeShortsVideo",
 
-"country",
+  "bio",
 
-"bio"
+  "areYouATvMoviesOttCelebrity",
+  "typeOfCeleb",
 
+  "whatAllPlatformsAreYouAvailableOn",
+
+  "howManyAmazonReviewsYouDoPerMonth",
+
+  "fetchedFromBrandPage",
+  "fetchedForBrand",
+
+  "platform",
+
+  "fetchedDate",
+
+  "InflunexaUserId",
 ];
 
 
@@ -639,7 +731,8 @@ reason:"No changes found"
 
 else{
 
-
+  // Generate unique 6-digit ID
+  creator.InflunexaUserId = await generateInflunexaUserId();
 await CsvCreator.create(creator);
 
 
@@ -1185,9 +1278,39 @@ if (typeOfCeleb) {
 // PLATFORM
 // ==============================
 if (platform) {
-  filter.platform = {
-    $in: platform.split(",").map(item => item.trim()),
-  };
+  const selectedPlatforms = platform
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const platformConditions = [];
+
+  if (selectedPlatforms.includes("Instagram")) {
+    platformConditions.push({
+      instagramProfileLink: {
+        $exists: true,
+        $nin: ["", null],
+      },
+    });
+  }
+
+  if (selectedPlatforms.includes("YouTube")) {
+    platformConditions.push({
+      youtubeChannelLink: {
+        $exists: true,
+        $nin: ["", null],
+      },
+    });
+  }
+
+  if (platformConditions.length > 0) {
+    filter.$and = [
+      ...(filter.$and || []),
+      {
+        $or: platformConditions,
+      },
+    ];
+  }
 }
 
 // ==============================
@@ -1408,7 +1531,29 @@ message:error.message
 
 
 };
+const youtubeRangeOrder = [
+  "Under 1K",
+  "1K - 10K",
+  "10K - 50K",
+  "50K - 100K",
+  "100K+",
+];
 
+const sortYoutubeRanges = (ranges) => {
+  return [...new Set(
+    ranges.filter(
+      (value) => value && String(value).trim() !== ""
+    )
+  )].sort((a, b) => {
+    const indexA = youtubeRangeOrder.indexOf(a);
+    const indexB = youtubeRangeOrder.indexOf(b);
+
+    return (
+      (indexA === -1 ? 999 : indexA) -
+      (indexB === -1 ? 999 : indexB)
+    );
+  });
+};
 
 // GET DYNAMIC FILTER OPTIONS
 export const getCsvFilterOptions = async (req, res) => {
@@ -1423,21 +1568,77 @@ export const getCsvFilterOptions = async (req, res) => {
       typeOfCeleb: 1,
       platform: 1,
       youtubeSubscribersRange: 1,
+      instagramUsername: 1,
+instagramProfileLink: 1,
+youtubeUsername: 1,
+youtubeChannelLink: 1,
       _id: 0,
     });
 
     const unique = (arr) =>
       [...new Set(arr.filter(v => v && String(v).trim() !== ""))].sort();
+  // =========================================
+    // PLATFORM
+    // =========================================
+
+    const platformSet = new Set();
+
+    creators.forEach((creator) => {
+
+      // Existing platform field
+      if (creator.platform) {
+        String(creator.platform)
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .forEach((item) => {
+            const normalized = item.toLowerCase();
+
+            if (normalized === "instagram") {
+              platformSet.add("Instagram");
+            }
+
+            if (
+              normalized === "youtube" ||
+              normalized === "you tube"
+            ) {
+              platformSet.add("YouTube");
+            }
+          });
+      }
+
+      // =========================================
+      // Detect Instagram from Instagram details
+      // =========================================
+
+      if (
+        creator.instagramUsername?.trim() ||
+        creator.instagramProfileLink?.trim()
+      ) {
+        platformSet.add("Instagram");
+      }
+
+      // =========================================
+      // Detect YouTube from YouTube details
+      // =========================================
+
+      if (
+        creator.youtubeUsername?.trim() ||
+        creator.youtubeChannelLink?.trim()
+      ) {
+        platformSet.add("YouTube");
+      }
+    });
 
     const options = {
       gender: unique(creators.map(c => c.gender)),
       state: unique(creators.map(c => c.state)),
       country: unique(creators.map(c => c.country)),
       typeOfCeleb: unique(creators.map(c => c.typeOfCeleb)),
-      platform: unique(creators.map(c => c.platform)),
-      youtubeSubscribersRange: unique(
-        creators.map(c => c.youtubeSubscribersRange)
-      ),
+     platform: [...platformSet].sort(),
+      youtubeSubscribersRange: sortYoutubeRanges(
+  creators.map(c => c.youtubeSubscribersRange)
+),
 
       categories: unique(
         creators.flatMap(c => c.categories || [])
@@ -1464,3 +1665,4 @@ export const getCsvFilterOptions = async (req, res) => {
     });
   }
 };
+
