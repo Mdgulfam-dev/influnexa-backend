@@ -20,12 +20,22 @@ const requiredInfluencerFields = [
    "fullName",
   "email",
   "country",
+   "consentToContact"
 ];
 
 function missingFields(body, fields) {
   return fields.filter((field) => {
     const value = body[field];
-    return value === undefined || value === null || String(value).trim() === "";
+
+    if (value === undefined || value === null) {
+      return true;
+    }
+
+    if (typeof value === "string") {
+      return value.trim() === "";
+    }
+
+    return false;
   });
 }
 
