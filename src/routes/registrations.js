@@ -149,6 +149,8 @@ router.post("/brands", async (req, res, next) => {
 });
 
 router.post("/influencers", async (req, res, next) => {
+  console.log("🔥🔥 CURRENT INFLUENCER ROUTE - 8640E2D 🔥🔥");
+  console.log("🔥 REQUIRED:", requiredInfluencerFields);
   try {
     const body = req.body || {};
 
@@ -163,13 +165,13 @@ router.post("/influencers", async (req, res, next) => {
       }
     }
 
-    // if (missing.length > 0) {
-    //   return res.status(400).json({
-    //     message:
-    //       "Please complete all required influencer fields.",
-    //     missing,
-    //   });
-    // }
+    if (missing.length > 0) {
+      return res.status(400).json({
+        message:
+          "Please complete all required influencer fields.",
+        missing,
+      });
+    }
 
     const email = normalizeEmail(body.email);
 
