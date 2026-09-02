@@ -306,14 +306,13 @@ router.get("/dashboard", async (req, res, next) => {
     };
     const influencerFilter = {
       ...buildSearchFilter(req.query.influencerSearch, [
-        "creatorName",
-        "fullName",
-        "email",
-        "phone",
-        "country",
-        "city",
-        "primaryPlatform",
-        "categories",
+         "fullName",
+    "email",
+    "phoneNumber",
+    "country",
+    "city",
+    "whatAllPlatformsAreYouAvailableOn",
+    "categories"
       ]),
       ...buildStatusFilter(req.query.influencerStatus),
     };
