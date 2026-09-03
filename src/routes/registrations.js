@@ -32,6 +32,10 @@ const requiredInfluencerFields = [
 
   // Step 3 - Profile
   "categories",
+   "engagementRate",
+  "audienceCountry",
+  "pastWorkWithBrands",
+
 
   // Step 4 - Platforms
   "whatAllPlatformsAreYouAvailableOn",
@@ -241,7 +245,8 @@ router.post("/influencers", async (req, res, next) => {
         // =====================================
         categories:
           normalizeArray(body.categories),
-
+engagementRate:
+  normalizeText(body.engagementRate),
         campaignType:
           normalizeArray(body.campaignType),
 
@@ -259,7 +264,11 @@ router.post("/influencers", async (req, res, next) => {
 
         languages:
           normalizeArray(body.languages),
+audienceCountry:
+  normalizeText(body.audienceCountry),
 
+pastWorkWithBrands:
+  normalizeText(body.pastWorkWithBrands),
         // =====================================
         // ADDRESS
         // =====================================
