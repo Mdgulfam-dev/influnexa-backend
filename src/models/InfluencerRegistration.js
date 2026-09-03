@@ -59,6 +59,12 @@ const influencerRegistrationSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    engagementRate: {
+  type: String,
+  default: "",
+  trim: true,
+},
+
 
     campaignType: {
       type: [String],
@@ -88,7 +94,17 @@ const influencerRegistrationSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+audienceCountry: {
+  type: String,
+  default: "",
+  trim: true,
+},
 
+pastWorkWithBrands: {
+  type: String,
+  default: "",
+  trim: true,
+},
     // Address
     fullAddress: {
       type: String,
