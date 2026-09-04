@@ -1117,9 +1117,7 @@ bio,
 
   platform,
 
-  fetchedFromBrandPage,
-  fetchedForBrand,
-  fetchedDate,
+
 
   InflunexaUserId,
  contactStatus,
@@ -1558,111 +1556,191 @@ const sortYoutubeRanges = (ranges) => {
 // GET DYNAMIC FILTER OPTIONS
 export const getCsvFilterOptions = async (req, res) => {
   try {
-    const creators = await CsvCreator.find({}, {
-      gender: 1,
-      state: 1,
-      country: 1,
-      categories: 1,
-      languages: 1,
-      campaignType: 1,
-      typeOfCeleb: 1,
-      platform: 1,
-      youtubeSubscribersRange: 1,
-      instagramUsername: 1,
-instagramProfileLink: 1,
-youtubeUsername: 1,
-youtubeChannelLink: 1,
-      _id: 0,
-    });
+
+    // =========================================
+    // FETCH ALL DATA IN PARALLEL
+    // =========================================
+
+    const [
+      genderData,
+      stateData,
+      countryData,
+      categoriesData,
+      languagesData,
+      campaignTypeData,
+      typeOfCelebData,
+      platformData,
+      youtubeSubscribersRangeData,
+      instagramUsernameData,
+      instagramProfileLinkData,
+      youtubeUsernameData,
+      youtubeChannelLinkData,
+    ] = await Promise.all([
+
+      CsvCreator.distinct("gender"),
+
+      CsvCreator.distinct("state"),
+
+      CsvCreator.distinct("country"),
+
+      CsvCreator.distinct("categories"),
+
+      CsvCreator.distinct("languages"),
+
+      CsvCreator.distinct("campaignType"),
+
+      CsvCreator.distinct("typeOfCeleb"),
+
+      CsvCreator.distinct("platform"),
+
+      CsvCreator.distinct("youtubeSubscribersRange"),
+
+      CsvCreator.distinct("instagramUsername"),
+
+      CsvCreator.distinct("instagramProfileLink"),
+
+      CsvCreator.distinct("youtubeUsername"),
+
+      CsvCreator.distinct("youtubeChannelLink"),
+
+    ]);
+
 
     const unique = (arr) =>
-      [...new Set(arr.filter(v => v && String(v).trim() !== ""))].sort();
-  // =========================================
+      [...new Set(
+        arr.filter(
+          v => v && String(v).trim() !== ""
+        )
+      )].sort();
+
+
+    // =========================================
     // PLATFORM
     // =========================================
 
     const platformSet = new Set();
 
-    creators.forEach((creator) => {
 
-      // Existing platform field
-      if (creator.platform) {
-        String(creator.platform)
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean)
-          .forEach((item) => {
-            const normalized = item.toLowerCase();
+    // Existing platform field
+    platformData.forEach((value) => {
 
-            if (normalized === "instagram") {
-              platformSet.add("Instagram");
-            }
+      if (!value) return;
 
-            if (
-              normalized === "youtube" ||
-              normalized === "you tube"
-            ) {
-              platformSet.add("YouTube");
-            }
-          });
-      }
+      String(value)
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .forEach((item) => {
 
-      // =========================================
-      // Detect Instagram from Instagram details
-      // =========================================
+          const normalized = item.toLowerCase();
 
-      if (
-        creator.instagramUsername?.trim() ||
-        creator.instagramProfileLink?.trim()
-      ) {
-        platformSet.add("Instagram");
-      }
+          if (normalized === "instagram") {
+            platformSet.add("Instagram");
+          }
 
-      // =========================================
-      // Detect YouTube from YouTube details
-      // =========================================
+          if (
+            normalized === "youtube" ||
+            normalized === "you tube"
+          ) {
+            platformSet.add("YouTube");
+          }
 
-      if (
-        creator.youtubeUsername?.trim() ||
-        creator.youtubeChannelLink?.trim()
-      ) {
-        platformSet.add("YouTube");
-      }
+        });
+
     });
 
+
+    // =========================================
+    // Detect Instagram from Instagram details
+    // =========================================
+
+    if (
+      instagramUsernameData.some(
+        value => value && String(value).trim() !== ""
+      )
+    ) {
+      platformSet.add("Instagram");
+    }
+
+    if (
+      instagramProfileLinkData.some(
+        value => value && String(value).trim() !== ""
+      )
+    ) {
+      platformSet.add("Instagram");
+    }
+
+
+    // =========================================
+    // Detect YouTube from YouTube details
+    // =========================================
+
+    if (
+      youtubeUsernameData.some(
+        value => value && String(value).trim() !== ""
+      )
+    ) {
+      platformSet.add("YouTube");
+    }
+
+    if (
+      youtubeChannelLinkData.some(
+        value => value && String(value).trim() !== ""
+      )
+    ) {
+      platformSet.add("YouTube");
+    }
+
+
+    // =========================================
+    // SAME RESPONSE STRUCTURE
+    // =========================================
+
     const options = {
-      gender: unique(creators.map(c => c.gender)),
-      state: unique(creators.map(c => c.state)),
-      country: unique(creators.map(c => c.country)),
-      typeOfCeleb: unique(creators.map(c => c.typeOfCeleb)),
-     platform: [...platformSet].sort(),
-      youtubeSubscribersRange: sortYoutubeRanges(
-  creators.map(c => c.youtubeSubscribersRange)
-),
+
+      gender: unique(genderData),
+
+      state: unique(stateData),
+
+      country: unique(countryData),
+
+      typeOfCeleb: unique(typeOfCelebData),
+
+      platform: [...platformSet].sort(),
+
+      youtubeSubscribersRange:
+        sortYoutubeRanges(
+          youtubeSubscribersRangeData
+        ),
 
       categories: unique(
-        creators.flatMap(c => c.categories || [])
+        categoriesData
       ),
 
       languages: unique(
-        creators.flatMap(c => c.languages || [])
+        languagesData
       ),
 
       campaignType: unique(
-        creators.flatMap(c => c.campaignType || [])
+        campaignTypeData
       ),
+
     };
 
-    res.json({
+
+    return res.json({
       success: true,
       options,
     });
 
+
   } catch (error) {
+
     res.status(500).json({
       success: false,
       message: error.message,
     });
+
   }
 };
 
