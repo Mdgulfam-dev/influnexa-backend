@@ -40,7 +40,7 @@ router.post("/", async (req, res, next) => {
       email,
       quote,
       rating,
-      status: "pending",
+      status:"pending",
     });
 
     res.status(201).json({

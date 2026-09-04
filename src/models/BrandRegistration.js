@@ -26,7 +26,7 @@ export const brandStatuses = [
 
 const brandRegistrationSchema = new mongoose.Schema(
   {
-    contactName: { type: String, required: true, trim: true },
+    fullName: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true, lowercase: true, unique: true },
     phone: { type: String, trim: true },
     companyName: { type: String, required: true, trim: true },
@@ -64,7 +64,7 @@ brandRegistrationSchema.index({ status: 1, industry: 1, createdAt: -1 });
 brandRegistrationSchema.index({ companyName: 1 });
 brandRegistrationSchema.index({
   companyName: "text",
-  contactName: "text",
+  fullName: "text",
   email: "text",
   phone: "text",
   country: "text",

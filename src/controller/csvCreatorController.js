@@ -874,15 +874,22 @@ export const updateCsvCreator = async (req, res) => {
       req.params.id,
     {
       ...req.body,
+      updatedBy: req.adminUser?.email ,
       editStatus: "Edited Manually",
         updatedAt: new Date(),
     },
       {
-        new:true
+        new:true,
+         runValidators: true,
       }
     );
 
-
+if (!updatedCreator) {
+      return res.status(404).json({
+        success: false,
+        message: "Creator not found",
+      });
+    }
     res.status(200).json({
       success:true,
       creator: updatedCreator

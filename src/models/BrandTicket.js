@@ -7,7 +7,7 @@ const brandTicketSchema = new mongoose.Schema(
     ticketNumber: { type: String, required: true, unique: true, trim: true },
     brandName: { type: String, required: true, trim: true },
     campaignName: { type: String, required: true, trim: true },
-    contactName: { type: String, trim: true },
+    fullName: { type: String, trim: true },
     contactEmail: { type: String, trim: true, lowercase: true },
     objective: { type: String, trim: true },
     platforms: [{ type: String, trim: true }],
