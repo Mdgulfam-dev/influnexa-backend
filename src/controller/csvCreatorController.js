@@ -591,14 +591,7 @@ const compareFields=[
 
   "howManyAmazonReviewsYouDoPerMonth",
 
-  "fetchedFromBrandPage",
-  "fetchedForBrand",
-
   "platform",
-
-  "fetchedDate",
-
-  "InflunexaUserId",
 ];
 
 
