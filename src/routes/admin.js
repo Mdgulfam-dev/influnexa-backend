@@ -290,7 +290,7 @@ router.get("/dashboard", async (req, res, next) => {
     const brandFilter = {
       ...buildSearchFilter(req.query.brandSearch, [
         "companyName",
-        "contactName",
+        "fullName",
         "email",
         "phone",
         "country",
@@ -461,7 +461,7 @@ function ticketPayload(body) {
   return {
     value: {
       brandName: String(body.brandName).trim(), campaignName: String(body.campaignName).trim(),
-      contactName: String(body.contactName || "").trim(), contactEmail: String(body.contactEmail || "").trim(),
+      fullName: String(body.fullName || "").trim(), contactEmail: String(body.contactEmail || "").trim(),
       objective: String(body.objective || "").trim(), platforms: Array.isArray(body.platforms) ? body.platforms.filter(Boolean) : String(body.platforms || "").split(",").map((item) => item.trim()).filter(Boolean),
       startDate: body.startDate || undefined, endDate: body.endDate || undefined, budget: number(body.budget),
       currency: String(body.currency || "USD").trim(), status: ticketStatuses.includes(body.status) ? body.status : "Draft",

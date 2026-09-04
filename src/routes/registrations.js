@@ -5,7 +5,7 @@ import InfluencerRegistration from "../models/InfluencerRegistration.js";
 const router = express.Router();
 
 const requiredBrandFields = [
-  "contactName",
+  "fullName",
   "email",
   "companyName",
   "country",
