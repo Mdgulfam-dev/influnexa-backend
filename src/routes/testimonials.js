@@ -30,8 +30,22 @@ router.post("/", async (req, res, next) => {
   try {
     const { name, role, email, quote, rating = 5 } = req.body;
 
-    if (!name || !role || !quote) {
+    if (!name || !role ||!email|| !quote) {
       return res.status(400).json({ message: "Name, role, and review are required." });
+    }
+ // Normalize email
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check if this email has already submitted a testimonial
+    const existingTestimonial = await Testimonial.findOne({
+      email: normalizedEmail,
+    });
+
+    if (existingTestimonial) {
+      return res.status(409).json({
+        message:
+          "This email already exist.",
+      });
     }
 
     const testimonial = await Testimonial.create({

@@ -222,7 +222,7 @@ function followerRangeFilter(range) {
   };
 
   return ranges[range]
-    ? { followerCount: ranges[range] }
+    ? { exactFollowers: ranges[range] }
     : {};
 }
 
@@ -238,11 +238,43 @@ function registrationFilter(query, type) {
       ...valuesFilter(query.country, "country"),
       ...valuesFilter(query.state, "state"),
       ...valuesFilter(query.location, "city"),
-      ...valuesFilter(query.platform, "primaryPlatform"),
+      ...(query.platform
+  ? {
+      platform: {
+        $regex: escapeRegex(query.platform),
+        $options: "i",
+      },
+    }
+  : {}),
       ...valuesFilter(query.category, "categories"),
-      ...valuesFilter(String(query.language || "").toLowerCase(), "languageTags"),
+     ...(query.language
+  ? {
+      languages: {
+        $elemMatch: {
+          $regex: escapeRegex(query.language),
+          $options: "i",
+        },
+      },
+    }
+  : {}),
       ...numericRangeFilter(query.followerMin, query.followerMax, "followerCount"),
       ...followerRangeFilter(query.followerRange),
+       // Campaign Type
+      ...(query.campaignType
+        ? {
+            campaignType: {
+              $in: [query.campaignType],
+            },
+          }
+        : {}),
+
+      // Influencer Type
+      ...(query.influencerType
+        ? {
+            influencerType: query.influencerType,
+          }
+        : {}),
+      
     };
 
   return {
@@ -306,16 +338,33 @@ router.get("/dashboard", async (req, res, next) => {
     };
     const influencerFilter = {
       ...buildSearchFilter(req.query.influencerSearch, [
-         "fullName",
+     "fullName",
     "email",
     "phoneNumber",
     "country",
     "city",
     "whatAllPlatformsAreYouAvailableOn",
-    "categories"
+    "categories",
+  
       ]),
+        ...(req.query.campaignType
+    ? {
+        campaignType: req.query.campaignType,
+      }
+    : {}),
+
+  ...(req.query.influencerType
+    ? {
+        influencerType: req.query.influencerType,
+      }
+    : {}),
+
+
       ...buildStatusFilter(req.query.influencerStatus),
+       
     };
+
+
     const candidateFilter = {
       ...buildSearchFilter(req.query.candidateSearch, ["name", "email", "phone", "jobId", "jobTitle"]),
       ...buildStatusFilter(req.query.candidateStatus),

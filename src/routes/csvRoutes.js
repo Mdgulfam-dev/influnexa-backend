@@ -1,5 +1,4 @@
 import express from "express";
-import { requireAdmin } from "../middleware/adminAuth.js";
 import uploadCSV from "../middleware/uploadCSV.js";
 
 import {
@@ -19,7 +18,6 @@ const router = express.Router();
 // Upload CSV File
 router.post(
   "/upload",
-  requireAdmin,
   uploadCSV.single("file"),
   uploadCreatorsCSV
 );
@@ -41,7 +39,6 @@ router.get(
 // Update CSV Creator
 router.put(
   "/:id",
-   requireAdmin,
   updateCsvCreator
 );
 
