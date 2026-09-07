@@ -228,7 +228,12 @@ const csvCreatorSchema = new mongoose.Schema(
         unique: true,
   sparse: true,
     },
-
+creatorRating: {
+  type: Number,
+  min: 1,
+  max: 10,
+  default: null,
+},
     editStatus: {
       type: String,
       default: "",

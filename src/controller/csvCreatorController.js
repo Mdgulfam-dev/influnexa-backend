@@ -869,12 +869,12 @@ return res.status(200).json({
 export const updateCsvCreator = async (req, res) => {
 
   try {
-
+   console.log("REQ BODY:", req.body);
+    console.log("ADMIN EMAIL RECEIVED:",req.body.updatedBy);
     const updatedCreator = await CsvCreator.findByIdAndUpdate(
       req.params.id,
     {
       ...req.body,
-      updatedBy: req.adminUser?.email ,
       editStatus: "Edited Manually",
         updatedAt: new Date(),
     },
@@ -890,6 +890,8 @@ if (!updatedCreator) {
         message: "Creator not found",
       });
     }
+
+    console.log("ADMIN EMAIL SAVED:", updatedCreator.updatedBy);
     res.status(200).json({
       success:true,
       creator: updatedCreator
@@ -1068,7 +1070,7 @@ const {
   instagramUsername,
   instagramProfileLink,
   instagramFollowersRange,
-  exactFollowers,
+ 
 
   categories,
 
@@ -1191,15 +1193,15 @@ if (instagramFollowersRange) {
   };
 }
 // Exact Followers Filter
-if (req.query.exactFollowers?.trim()) {
-  filter.$expr = {
-    $regexMatch: {
-      input: { $toString: "$exactFollowers" },
-      regex: "^" + req.query.exactFollowers,
-      options: "i"
-    }
-  };
-}
+// if (req.query.exactFollowers?.trim()) {
+//   filter.$expr = {
+//     $regexMatch: {
+//       input: { $toString: "$exactFollowers" },
+//       regex: "^" + req.query.exactFollowers,
+//       options: "i"
+//     }
+//   };
+// }
 
 // ==============================
 // CATEGORY
