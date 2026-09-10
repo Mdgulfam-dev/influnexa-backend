@@ -52,6 +52,7 @@ router.post("/", async (req, res, next) => {
       name,
       role,
       email,
+        type: type || "Brand",
       quote,
       rating,
       status:"pending",

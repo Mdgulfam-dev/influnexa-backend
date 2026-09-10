@@ -184,6 +184,66 @@ const generateInflunexaUserId = async () => {
 
   return userId;
 };
+
+
+const findDuplicateRowsInCSV = (creators) => {
+  const seen = {
+    email: new Map(),
+    phoneNumber: new Map(),
+    instagramUsername: new Map(),
+    youtubeUsername: new Map(),
+  };
+
+  const duplicateRows = new Map();
+
+  creators.forEach((creator, index) => {
+    const rowNumber = index + 2;
+
+    const identifiers = {
+      email: cleanEmail(creator.email),
+
+      phoneNumber: cleanPhone(creator.phoneNumber),
+
+      instagramUsername: cleanText(
+        creator.instagramUsername
+      ).toLowerCase(),
+
+      youtubeUsername: cleanText(
+        creator.youtubeUsername
+      ).toLowerCase(),
+    };
+
+    Object.entries(identifiers).forEach(([field, value]) => {
+      if (!value) return;
+
+      if (seen[field].has(value)) {
+
+        if (!duplicateRows.has(index)) {
+          duplicateRows.set(index, []);
+        }
+
+        duplicateRows.get(index).push({
+          field,
+          value,
+          firstRow: seen[field].row,
+          duplicateRow: rowNumber,
+        });
+
+      } else {
+
+        seen[field].set(value, {
+          row: rowNumber,
+          index,
+        });
+
+      }
+    });
+  });
+
+  return duplicateRows;
+};
+
+
 // ==========================
 // UPLOAD CSV
 // ==========================
@@ -379,6 +439,13 @@ const instagramFollowersRange =
               message: "CSV has no data",
             });
           }
+
+          const duplicateRows = findDuplicateRowsInCSV(creators);
+
+    console.log(
+      "Duplicate rows found:",
+      duplicateRows.size
+    );
           const isFirstUpload =
   (await CsvCreator.countDocuments()) === 0;
            const report = [];
@@ -392,6 +459,30 @@ const instagramFollowersRange =
   await Promise.all(
   creators.map((creator, index) => 
         limit(async () => {
+
+
+          if (duplicateRows.has(index)) {
+
+      const duplicates = duplicateRows.get(index);
+
+      report.push({
+        row: index + 2,
+        fullName: creator.fullName,
+        email: creator.email,
+        phoneNumber: creator.phoneNumber,
+        instagramUsername: creator.instagramUsername,
+        youtubeUsername: creator.youtubeUsername,
+        status: "Skipped",
+        reason: `Duplicate user in CSV: ${duplicates
+          .map(
+            (duplicate) =>
+              `${duplicate.field} (${duplicate.value})`
+          )
+          .join(", ")}`
+      });
+
+      return;
+    } 
 
 //     if (!creator.fullName?.trim()) {
 
@@ -591,7 +682,8 @@ const compareFields=[
 
   "howManyAmazonReviewsYouDoPerMonth",
 
-  "platform",
+  "platform"
+ 
 ];
 
 
