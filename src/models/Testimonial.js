@@ -12,6 +12,7 @@ const testimonialSchema = new mongoose.Schema(
   trim: true,
   index: true,
 },
+
     quote: { type: String, required: true, trim: true, maxlength: 600 },
     rating: { type: Number, min: 1, max: 5, default: 5 },
     status: {
