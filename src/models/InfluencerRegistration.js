@@ -32,6 +32,11 @@ const influencerRegistrationSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    instagramAverageViews: {
+  type: Number,
+  default: 0,
+  min: 0,
+},
 
     // Contact
     phoneNumber: {
@@ -160,7 +165,11 @@ pastWorkWithBrands: {
       default: "",
       trim: true,
     },
-
+youtubeAverageViews: {
+  type: Number,
+  default: 0,
+  min: 0,
+},
     // Commercials
     commercialsFor1InstagramReel: {
       type: Number,

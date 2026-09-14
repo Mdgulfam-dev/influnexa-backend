@@ -90,7 +90,7 @@ export const uploadBrandsCSV = async (req, res) => {
           ),
 
           designation: cleanText(
-            row["designation"]
+            row["Designation"]
           ),
 
           email: cleanEmail(

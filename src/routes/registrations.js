@@ -228,7 +228,8 @@ router.post("/influencers", async (req, res, next) => {
 
         exactFollowers:
           toNumber(body.exactFollowers),
-
+instagramAverageViews:
+  toNumber(body.instagramAverageViews),
         // =====================================
         // CONTACT
         // =====================================
@@ -305,7 +306,8 @@ pastWorkWithBrands:
           normalizeText(
             body.youtubeSubscribersRange
           ),
-
+youtubeAverageViews:
+  toNumber(body.youtubeAverageViews),
         // =====================================
         // COMMERCIALS
         // =====================================
