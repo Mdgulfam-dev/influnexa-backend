@@ -52,6 +52,120 @@ const cleanPhone = (value) => {
   return phone;
 };
 
+
+// ========================================
+// FIND DUPLICATE BRANDS INSIDE CSV
+// ========================================
+
+const findDuplicateBrandsInCSV = (brands) => {
+  const seen = {
+     companyName: new Map(),
+  fullName: new Map(),
+  designation: new Map(),
+  email: new Map(),
+  officialEmail: new Map(),
+  mobileNumber: new Map(),
+  linkedinProfile: new Map(),
+  city: new Map(),
+  address: new Map(),
+  directors: new Map(),
+  ageOfCompany: new Map(),
+  websiteUrl: new Map(),
+  dataType: new Map(),
+  };
+
+  const duplicateRows = new Map();
+
+  brands.forEach((brand, index) => {
+    // CSV row = header row + data row
+    const rowNumber = index + 2;
+
+    const identifiers = {
+  companyName: cleanText(
+    brand.companyName
+  ).toLowerCase(),
+
+  fullName: cleanText(
+    brand.fullName
+  ).toLowerCase(),
+
+  designation: cleanText(
+    brand.designation
+  ).toLowerCase(),
+
+  email: cleanEmail(
+    brand.email
+  ),
+
+  officialEmail: cleanEmail(
+    brand.officialEmail
+  ),
+
+  mobileNumber: cleanPhone(
+    brand.mobileNumber
+  ),
+
+  linkedinProfile: cleanText(
+    brand.linkedinProfile
+  ).toLowerCase(),
+
+  city: cleanText(
+    brand.city
+  ).toLowerCase(),
+
+  address: cleanText(
+    brand.address
+  ).toLowerCase(),
+
+  directors: cleanText(
+    brand.directors
+  ).toLowerCase(),
+
+  ageOfCompany: cleanText(
+    brand.ageOfCompany
+  ).toLowerCase(),
+
+  websiteUrl: cleanText(
+    brand.websiteUrl
+  ).toLowerCase(),
+
+  dataType: cleanText(
+    brand.dataType
+  ).toLowerCase(),
+
+  
+};
+
+    Object.entries(identifiers).forEach(
+      ([field, value]) => {
+        if (!value) return;
+
+        if (seen[field].has(value)) {
+          if (!duplicateRows.has(index)) {
+            duplicateRows.set(index, []);
+          }
+
+          duplicateRows.get(index).push({
+            field,
+            value,
+            firstRow: seen[field].row,
+            duplicateRow: rowNumber,
+          });
+        } else {
+          seen[field].set(value, {
+            row: rowNumber,
+            index,
+          });
+        }
+      }
+    );
+  });
+
+  return duplicateRows;
+};
+
+
+
 // ========================================
 // UPLOAD BRAND CSV
 // ========================================
@@ -157,7 +271,13 @@ export const uploadBrandsCSV = async (req, res) => {
               message: "CSV has no data",
             });
           }
+const duplicateRows =
+  findDuplicateBrandsInCSV(brands);
 
+console.log(
+  "Duplicate brands found in CSV:",
+  duplicateRows.size
+);
           const isFirstUpload =
             (await CsvBrand.countDocuments()) === 0;
 
@@ -174,6 +294,30 @@ export const uploadBrandsCSV = async (req, res) => {
             brands.map((brand, index) =>
               limit(async () => {
                 try {
+
+                  if (duplicateRows.has(index)) {
+  const duplicates =
+    duplicateRows.get(index);
+
+  report.push({
+    row: index + 2,
+    companyName: brand.companyName,
+    fullName: brand.fullName,
+    email: brand.email,
+    officialEmail: brand.officialEmail,
+    mobileNumber: brand.mobileNumber,
+    status: "Skipped",
+    reason:
+      `Duplicate in uploaded CSV: ${duplicates
+        .map(
+          (duplicate) =>
+            `${duplicate.field} (${duplicate.value})`
+        )
+        .join(", ")}`,
+  });
+
+  return;
+}
                   // ========================================
                   // VALIDATION
                   // ========================================
