@@ -631,6 +631,25 @@ router.post("/users", async (req, res, next) => {
   }
 });
 
+router.get("/users", async (req, res, next) => {
+  try {
+    const users = await AdminUser.find({
+      status: "active",
+    })
+      .select("_id name email role status")
+      .sort({ name: 1 })
+      .lean();
+
+    return res.json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    console.error("GET ADMIN USERS ERROR:", error);
+    return next(error);
+  }
+});
+
 router.patch("/users/me/password", async (req, res, next) => {
   try {
     if (!req.adminUser?._id) {
