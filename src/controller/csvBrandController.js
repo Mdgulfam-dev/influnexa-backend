@@ -58,21 +58,8 @@ const cleanPhone = (value) => {
 // ========================================
 
 const findDuplicateBrandsInCSV = (brands) => {
-  const seen = {
-     companyName: new Map(),
-  fullName: new Map(),
-  designation: new Map(),
-  email: new Map(),
-  officialEmail: new Map(),
-  mobileNumber: new Map(),
-  linkedinProfile: new Map(),
-  city: new Map(),
-  address: new Map(),
-  directors: new Map(),
-  ageOfCompany: new Map(),
-  websiteUrl: new Map(),
-  dataType: new Map(),
-  };
+  const seenAllFields = new Map();
+  const seenContactFields = new Map();
 
   const duplicateRows = new Map();
 
@@ -81,89 +68,89 @@ const findDuplicateBrandsInCSV = (brands) => {
     const rowNumber = index + 2;
 
     const identifiers = {
-  companyName: cleanText(
-    brand.companyName
-  ).toLowerCase(),
+      companyName: cleanText(brand.companyName).toLowerCase(),
+      fullName: cleanText(brand.fullName).toLowerCase(),
+      email: cleanEmail(brand.email),
+      officialEmail: cleanEmail(brand.officialEmail),
+      mobileNumber: cleanPhone(brand.mobileNumber),
+    };
 
-  fullName: cleanText(
-    brand.fullName
-  ).toLowerCase(),
+    // ========================================
+    // ALL 5 FIELDS
+    // ========================================
 
-  designation: cleanText(
-    brand.designation
-  ).toLowerCase(),
+    const allFieldsKey = [
+      identifiers.companyName,
+      identifiers.fullName,
+      identifiers.email,
+      identifiers.officialEmail,
+      identifiers.mobileNumber,
+    ].join("|");
 
-  email: cleanEmail(
-    brand.email
-  ),
+    // ========================================
+    // EMAIL + OFFICIAL EMAIL + MOBILE
+    // ========================================
 
-  officialEmail: cleanEmail(
-    brand.officialEmail
-  ),
+    const contactKey = [
+      identifiers.email,
+      identifiers.officialEmail,
+      identifiers.mobileNumber,
+    ].join("|");
 
-  mobileNumber: cleanPhone(
-    brand.mobileNumber
-  ),
+    // Only check contact key if all 3 contact fields exist
+    const hasAllContactFields =
+      identifiers.email &&
+      identifiers.officialEmail &&
+      identifiers.mobileNumber;
 
-  linkedinProfile: cleanText(
-    brand.linkedinProfile
-  ).toLowerCase(),
+    // ========================================
+    // CHECK DUPLICATE
+    // ========================================
 
-  city: cleanText(
-    brand.city
-  ).toLowerCase(),
+    const duplicateOf =
+      seenAllFields.get(allFieldsKey) ||
+      (hasAllContactFields
+        ? seenContactFields.get(contactKey)
+        : null);
 
-  address: cleanText(
-    brand.address
-  ).toLowerCase(),
-
-  directors: cleanText(
-    brand.directors
-  ).toLowerCase(),
-
-  ageOfCompany: cleanText(
-    brand.ageOfCompany
-  ).toLowerCase(),
-
-  websiteUrl: cleanText(
-    brand.websiteUrl
-  ).toLowerCase(),
-
-  dataType: cleanText(
-    brand.dataType
-  ).toLowerCase(),
-
-  
-};
-
-    Object.entries(identifiers).forEach(
-      ([field, value]) => {
-        if (!value) return;
-
-        if (seen[field].has(value)) {
-          if (!duplicateRows.has(index)) {
-            duplicateRows.set(index, []);
-          }
-
-          duplicateRows.get(index).push({
-            field,
-            value,
-            firstRow: seen[field].row,
-            duplicateRow: rowNumber,
-          });
-        } else {
-          seen[field].set(value, {
-            row: rowNumber,
-            index,
-          });
-        }
+    if (duplicateOf) {
+      if (!duplicateRows.has(index)) {
+        duplicateRows.set(index, []);
       }
-    );
+
+      duplicateRows.get(index).push({
+        field: hasAllContactFields
+          ? "email + officialEmail + mobileNumber"
+          : "all fields",
+        value: hasAllContactFields
+          ? contactKey
+          : allFieldsKey,
+        firstRow: duplicateOf.row,
+        duplicateRow: rowNumber,
+      });
+
+      return;
+    }
+
+    // ========================================
+    // SAVE FIRST OCCURRENCE
+    // ========================================
+
+    seenAllFields.set(allFieldsKey, {
+      row: rowNumber,
+      index,
+    });
+
+    if (hasAllContactFields) {
+      seenContactFields.set(contactKey, {
+        row: rowNumber,
+        index,
+      });
+    }
   });
 
   return duplicateRows;
 };
-
 
 
 // ========================================
@@ -307,13 +294,12 @@ console.log(
     officialEmail: brand.officialEmail,
     mobileNumber: brand.mobileNumber,
     status: "Skipped",
-    reason:
-      `Duplicate in uploaded CSV: ${duplicates
-        .map(
-          (duplicate) =>
-            `${duplicate.field} (${duplicate.value})`
-        )
-        .join(", ")}`,
+   reason: `Duplicate in uploaded CSV:\n${duplicates
+  .map(
+    (duplicate) =>
+      ` ${duplicate.field}: ${duplicate.value}`
+  )
+  .join("\n")}`,
   });
 
   return;
@@ -351,8 +337,9 @@ console.log(
                   }
 
                   if (
-                    !brand.officialEmail &&
-                    !brand.mobileNumber
+                    !brand.email &&
+                    !brand.mobileNumber &&
+                    !brand.officialEmail
                   ) {
                     failedRecords++;
 
@@ -712,7 +699,22 @@ console.log(
             "BRAND REPORT ROWS:",
             report.length
           );
+const filteredReport = report.filter(
+  (item) =>
+    item.status === "Failed" ||
+    item.status === "Updated" ||
+    item.status === "Skipped"
+);
 
+console.log(
+  "TOTAL BRANDS:",
+  report.length
+);
+
+console.log(
+  "REPORT ROWS (FAILED + UPDATED):",
+  filteredReport.length
+);
           // ========================================
           // SAVE REPORT
           // ========================================
@@ -729,8 +731,8 @@ console.log(
               updatedRecords,
 
               failedRecords,
-
-              report,
+               report: filteredReport,
+             
             });
 
           // ========================================
@@ -773,8 +775,9 @@ console.log(
 
             failedRecords,
 
-            report,
+            report: filteredReport,
           });
+          
         } catch (error) {
           console.error(
             "BRAND INSERT ERROR:",
@@ -823,45 +826,70 @@ console.log(
 // ========================================
 // UPDATE CSV BRAND STATUS
 // ========================================
-
 export const updateCsvBrand = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, completedBy } = req.body;
 
-    if (!status) {
+    const updateData = {};
+
+    // ========================================
+    // UPDATE STATUS
+    // ========================================
+
+    if (status !== undefined) {
+      const allowedStatuses = [
+        "Pending",
+        "Reachout",
+        "Followup-1",
+        "Followup-2",
+        "Followup-3",
+        "Nurture",
+        "Interested",
+        "Proposal Sent",
+        "Negotiation",
+        "Won",
+        "Lost/Not Interested",
+        "No Response",
+      ];
+
+      if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid status",
+        });
+      }
+
+      updateData.status = status;
+    }
+
+    // ========================================
+    // UPDATE COMPLETED BY
+    // ========================================
+
+    if (completedBy !== undefined) {
+      updateData.completedBy = completedBy || null;
+    }
+
+    // ========================================
+    // NOTHING TO UPDATE
+    // ========================================
+
+    if (Object.keys(updateData).length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Status is required",
+        message: "No update data provided",
       });
     }
 
-    const allowedStatuses = [
-      "Pending",
-      "Reachout",
-      "Followup-1",
-      "Followup-2",
-      "Followup-3",
-      "Nurture",
-      "Interested",
-      "Proposal Sent",
-      "Negotiation",
-      "Won",
-      "Lost/Not Interested",
-      "No Response",
-    ];
-
-    if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid status",
-      });
-    }
+    // ========================================
+    // UPDATE DATABASE
+    // ========================================
 
     const brand = await CsvBrand.findByIdAndUpdate(
       id,
       {
-        status: status,
+        $set: updateData,
       },
       {
         new: true,
@@ -878,7 +906,7 @@ export const updateCsvBrand = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Brand status updated successfully",
+      message: "Brand updated successfully",
       data: brand,
     });
 
@@ -895,6 +923,8 @@ export const updateCsvBrand = async (req, res) => {
     });
   }
 };
+
+
 // ========================================
 // GET LATEST BRAND REPORT
 // ========================================

@@ -185,14 +185,9 @@ const generateInflunexaUserId = async () => {
   return userId;
 };
 
-
 const findDuplicateRowsInCSV = (creators) => {
-  const seen = {
-    email: new Map(),
-    phoneNumber: new Map(),
-    instagramUsername: new Map(),
-    youtubeUsername: new Map(),
-  };
+  const seenAllFields = new Map();
+  const seenContactFields = new Map();
 
   const duplicateRows = new Map();
 
@@ -213,36 +208,80 @@ const findDuplicateRowsInCSV = (creators) => {
       ).toLowerCase(),
     };
 
-    Object.entries(identifiers).forEach(([field, value]) => {
-      if (!value) return;
+    // ========================================
+    // ALL 4 FIELDS
+    // ========================================
 
-      if (seen[field].has(value)) {
+    const allFieldsKey = [
+      identifiers.email,
+      identifiers.phoneNumber,
+      identifiers.instagramUsername,
+      identifiers.youtubeUsername,
+    ].join("|");
 
-        if (!duplicateRows.has(index)) {
-          duplicateRows.set(index, []);
-        }
+    // ========================================
+    // EMAIL + PHONE NUMBER
+    // ========================================
 
-        duplicateRows.get(index).push({
-          field,
-          value,
-          firstRow: seen[field].row,
-          duplicateRow: rowNumber,
-        });
+    const contactKey = [
+      identifiers.email,
+      identifiers.phoneNumber,
+    ].join("|");
 
-      } else {
+    const hasBothContactFields =
+      identifiers.email &&
+      identifiers.phoneNumber;
 
-        seen[field].set(value, {
-          row: rowNumber,
-          index,
-        });
+    // ========================================
+    // CHECK DUPLICATE
+    // ========================================
 
+    const duplicateOf =
+      seenAllFields.get(allFieldsKey) ||
+      (hasBothContactFields
+        ? seenContactFields.get(contactKey)
+        : null);
+
+    if (duplicateOf) {
+      if (!duplicateRows.has(index)) {
+        duplicateRows.set(index, []);
       }
+
+      duplicateRows.get(index).push({
+        field: hasBothContactFields
+          ? "email + phoneNumber"
+          : "all fields",
+
+        value: hasBothContactFields
+          ? contactKey
+          : allFieldsKey,
+
+        firstRow: duplicateOf.row,
+        duplicateRow: rowNumber,
+      });
+
+      return;
+    }
+
+    // ========================================
+    // SAVE FIRST OCCURRENCE
+    // ========================================
+
+    seenAllFields.set(allFieldsKey, {
+      row: rowNumber,
+      index,
     });
+
+    if (hasBothContactFields) {
+      seenContactFields.set(contactKey, {
+        row: rowNumber,
+        index,
+      });
+    }
   });
 
   return duplicateRows;
 };
-
 
 // ==========================
 // UPLOAD CSV

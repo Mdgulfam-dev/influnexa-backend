@@ -90,6 +90,21 @@ const csvBrandSchema = new mongoose.Schema(
       ],
       default: "Pending",
     },
+
+
+completedBy: {
+  name: {
+    type: String,
+    default: "",
+  },
+  email: {
+    type: String,
+    default: "",
+  },
+},
+
+
+
 statusChangedAt: {
   type: Date,
   default: Date.now,

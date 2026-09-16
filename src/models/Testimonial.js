@@ -13,6 +13,12 @@ const testimonialSchema = new mongoose.Schema(
   index: true,
 },
 
+type: {
+  type: String,
+  enum: ["Brand", "Creator"],
+  default: "Brand",
+},
+
     quote: { type: String, required: true, trim: true, maxlength: 600 },
     rating: { type: Number, min: 1, max: 5, default: 5 },
     status: {

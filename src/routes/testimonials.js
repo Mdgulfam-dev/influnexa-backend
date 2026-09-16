@@ -9,6 +9,7 @@ function publicTestimonial(testimonial) {
     name: testimonial.name,
     role: testimonial.role,
     quote: testimonial.quote,
+      type: testimonial.type,
     rating: testimonial.rating,
     approvedAt: testimonial.approvedAt,
   };
@@ -28,9 +29,9 @@ router.get("/", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const { name, role, email, quote, rating = 5 } = req.body;
+    const { name, role, email, quote, type,rating = 5 } = req.body;
 
-    if (!name || !role ||!email|| !quote) {
+    if (!name || !role ||!email||!type|| !quote) {
       return res.status(400).json({ message: "Name, role, and review are required." });
     }
  // Normalize email
@@ -52,7 +53,7 @@ router.post("/", async (req, res, next) => {
       name,
       role,
       email,
-        type: type || "Brand",
+        type,
       quote,
       rating,
       status:"pending",
