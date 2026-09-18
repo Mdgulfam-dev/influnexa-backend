@@ -846,10 +846,12 @@ export const updateCsvBrand = async (req, res) => {
         "Followup-3",
         "Nurture",
         "Interested",
+        "Verified",
         "Proposal Sent",
         "Negotiation",
         "Won",
         "Lost/Not Interested",
+        "Not Useful",
         "No Response",
       ];
 
@@ -987,6 +989,8 @@ export const getCsvBrands = async (req, res) => {
       websiteUrl,
       dataType,
       status,
+      contactStatus,
+      completedBy,
       actionButton,
       editStatus,
 
@@ -1213,6 +1217,214 @@ if (dataType) {
       };
     }
 
+// ========================================
+// CONTACT STATUS FILTER
+// ========================================
+
+if (contactStatus) {
+  const selectedContactStatus = contactStatus
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (selectedContactStatus.length > 0) {
+
+    // ========================================
+    // MOBILE ONLY
+    // Has mobileNumber but NO email/officialEmail
+    // ========================================
+
+    if (
+      selectedContactStatus.includes("Mobile Only") &&
+      selectedContactStatus.length === 1
+    ) {
+      filter.$and = [
+        ...(filter.$and || []),
+
+        // Has mobile
+        {
+          mobileNumber: {
+            $exists: true,
+            $nin: ["", null],
+          },
+        },
+
+        // No email
+        {
+          $or: [
+            { email: { $exists: false } },
+            { email: null },
+            { email: "" },
+            { email: { $regex: /^\s*$/ } },
+          ],
+        },
+
+        // No official email
+        {
+          $or: [
+            { officialEmail: { $exists: false } },
+            { officialEmail: null },
+            { officialEmail: "" },
+            { officialEmail: { $regex: /^\s*$/ } },
+          ],
+        },
+      ];
+    }
+    // ========================================
+    // EMAIL ONLY
+    // Has email but NO officialEmail
+    // AND NO mobileNumber
+    // ========================================
+
+    else if (
+      selectedContactStatus.includes("Email Only") &&
+      selectedContactStatus.length === 1
+    ) {
+      filter.$and = [
+        ...(filter.$and || []),
+
+        // Has email
+        {
+          email: {
+            $exists: true,
+            $nin: ["", null],
+            $regex: /\S/,
+          },
+        },
+
+        // NO official email
+        {
+          $or: [
+            { officialEmail: { $exists: false } },
+            { officialEmail: null },
+            { officialEmail: "" },
+            { officialEmail: { $regex: /^\s*$/ } },
+          ],
+        },
+
+        // NO mobile
+        {
+          $or: [
+            { mobileNumber: { $exists: false } },
+            { mobileNumber: null },
+            { mobileNumber: "" },
+            { mobileNumber: { $regex: /^\s*$/ } },
+          ],
+        },
+      ];
+    }
+
+
+    // ========================================
+    // OFFICIAL EMAIL ONLY
+    // Has officialEmail but NO email
+    // AND NO mobileNumber
+    // ========================================
+
+    else if (
+      selectedContactStatus.includes("Official Email Only") &&
+      selectedContactStatus.length === 1
+    ) {
+      filter.$and = [
+        ...(filter.$and || []),
+
+        // Has official email
+        {
+          officialEmail: {
+            $exists: true,
+            $nin: ["", null],
+            $regex: /\S/,
+          },
+        },
+
+        // NO normal email
+        {
+          $or: [
+            { email: { $exists: false } },
+            { email: null },
+            { email: "" },
+            { email: { $regex: /^\s*$/ } },
+          ],
+        },
+
+        // NO mobile
+        {
+          $or: [
+            { mobileNumber: { $exists: false } },
+            { mobileNumber: null },
+            { mobileNumber: "" },
+            { mobileNumber: { $regex: /^\s*$/ } },
+          ],
+        },
+      ];
+    }
+    // ========================================
+    // BOTH EMAIL & MOBILE
+    // Has at least one email AND mobileNumber
+    // ========================================
+
+    else if (
+      selectedContactStatus.includes("Both Email & Mobile") &&
+      selectedContactStatus.length === 1
+    ) {
+      filter.$and = [
+        ...(filter.$and || []),
+
+        // Has email or official email
+        {
+          $or: [
+            {
+              email: {
+                $exists: true,
+                $nin: ["", null],
+                $regex: /\S/,
+              },
+            },
+            {
+              officialEmail: {
+                $exists: true,
+                $nin: ["", null],
+                $regex: /\S/,
+              },
+            },
+          ],
+        },
+
+        // Has mobile
+        {
+          mobileNumber: {
+            $exists: true,
+            $nin: ["", null],
+            $regex: /\S/,
+          },
+        },
+      ];
+    }
+  }
+}
+
+
+// ========================================
+// COMPLETED BY FILTER
+// ========================================
+// ========================================
+// COMPLETED BY FILTER
+// FILTER BY COMPLETED BY NAME
+// ========================================
+
+if (completedBy) {
+  const completedByNames = completedBy
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+
+  if (completedByNames.length > 0) {
+    filter["completedBy.name"] = {
+      $in: completedByNames,
+    };
+  }
+}
+
     // ========================================
     // ACTION BUTTON
     // ========================================
@@ -1404,11 +1616,13 @@ export const getCsvBrandFilterOptions = async (req, res) => {
       ageOfCompany,
       dataType,
       status,
+      completedBy,
     ] = await Promise.all([
       CsvBrand.distinct("designation"),
       CsvBrand.distinct("ageOfCompany"),
       CsvBrand.distinct("dataType"),
       CsvBrand.distinct("status"),
+        CsvBrand.distinct("completedBy.name"),
     ]);
 
     // Remove empty/null values and sort
@@ -1441,6 +1655,7 @@ export const getCsvBrandFilterOptions = async (req, res) => {
         ageOfCompany: cleanOptions(ageOfCompany),
         dataType: cleanOptions(dataType),
         status: cleanOptions(status),
+        completedBy: cleanOptions(completedBy),
       },
     });
 
@@ -1453,6 +1668,56 @@ export const getCsvBrandFilterOptions = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message,
+    });
+  }
+};
+
+
+
+
+// ========================================
+// DELETE ALL NOT USEFUL CSV BRANDS
+// ========================================
+
+export const deleteAllNotUsefulCsvBrands = async (req, res) => {
+  try {
+    // Safety check
+    const { status } = req.query;
+
+    if (status !== "Not Useful") {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Delete is allowed only when "Not Useful" status is selected.',
+      });
+    }
+
+    // Delete ALL Not Useful brands
+    const result = await CsvBrand.deleteMany({
+      status: "Not Useful",
+    });
+
+    // Notify frontend
+    if (io) {
+      io.emit("delete-all-not-useful-csv-brands");
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} Not Useful brands deleted successfully`,
+      deletedCount: result.deletedCount,
+    });
+
+  } catch (error) {
+    console.error(
+      "DELETE ALL NOT USEFUL CSV BRANDS ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete Not Useful brands",
+      error: error.message,
     });
   }
 };

@@ -354,14 +354,14 @@ const instagramFollowersRange =
 
           dateOfBirth: row["Date of Birth"] || "",
             influencerType: getInfluencerType(exactFollowers),
-          campaignType: row["Campaign type"]
-            ? row["Campaign type"]
+          campaignType: row["Campaign Type"]
+            ? row["Campaign Type"]
                 .split(",")
                 .map((item) => item.trim())
             : [],
 
           whatKindOfDealDoYouParticipateIn:
-            row["What kind of deal do you participate in"] || "",
+            row["What Kind Of Deal Do You Participate In"] || "",
 
           languages: row["Languages"]
             ? row["Languages"]
@@ -394,13 +394,13 @@ const instagramFollowersRange =
             row["Photo Link"] || "",
 
           youtubeUsername:
-            row["YouTube Username"] || "",
+            row["Youtube Username"] || "",
 
           youtubeChannelLink:
-            row["YouTube Channel Link"] || "",
+            row["Youtube Channel Link"] || "",
 
           youtubeSubscribersRange:  normalizeYoutubeSubscribersRange
-           ( row["YouTube Subscribers Range"] || ""),
+           ( row["Youtube Subscribers Range"] || ""),
 
           commercialsFor1InstagramReel:
             Number(row["Commercials For 1 Instagram Reel"]) || 0,
@@ -443,7 +443,7 @@ const instagramFollowersRange =
             row["Are you a TV/movies/OTT celebrity"] || "",
 
           typeOfCeleb:
-            row["Type of Celeb"] || "",
+            row["Type Of Celebrity"] || "",
 
           whatAllPlatformsAreYouAvailableOn:
             row["What all platforms are you avilable on"]
@@ -929,6 +929,28 @@ console.log(
     report.length
 );  
 
+// ========================================
+// FILTER REPORT
+// SAVE ONLY FAILED + UPDATED + SKIPPED
+// ========================================
+
+const filteredReport = report.filter(
+  (item) =>
+    item.status === "Failed" ||
+    item.status === "Updated" ||
+    item.status === "Skipped"
+);
+
+console.log(
+  "TOTAL CREATORS:",
+  report.length
+);
+
+console.log(
+  "REPORT ROWS (FAILED + UPDATED + SKIPPED):",
+  filteredReport.length
+);
+
 // SAVE REPORT PERMANENTLY
 const savedReport = await CSVUploadReport.create({
     fileName: req.file.originalname,
@@ -936,7 +958,7 @@ const savedReport = await CSVUploadReport.create({
     successfulRecords,
     updatedRecords,
     failedRecords,
-    report,
+    report: filteredReport,
 });
 
 
@@ -964,7 +986,7 @@ return res.status(200).json({
 
     failedRecords,
 
-    report,
+   report: filteredReport,
 });
         } catch (err) {
           console.error("INSERT ERROR:");
@@ -1254,6 +1276,8 @@ bio,
 
   InflunexaUserId,
  contactStatus,
+ age,
+
 
 page=1,
 limit=100
@@ -1600,11 +1624,426 @@ if (contactStatus) {
 
 }
 
+
+// ==============================
+// AGE FILTER
+// ==============================
+
+if (age) {
+  const selectedAges = age
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const ageConditions = [];
+
+  selectedAges.forEach((ageRange) => {
+    let minAge;
+    let maxAge;
+
+    switch (ageRange) {
+      case "Under 18":
+        minAge = 0;
+        maxAge = 17;
+        break;
+
+      case "18 - 24":
+        minAge = 18;
+        maxAge = 24;
+        break;
+
+      case "25 - 34":
+        minAge = 25;
+        maxAge = 34;
+        break;
+
+      case "35 - 44":
+        minAge = 35;
+        maxAge = 44;
+        break;
+
+      case "45 - 54":
+        minAge = 45;
+        maxAge = 54;
+        break;
+
+      case "55+":
+        minAge = 55;
+        break;
+
+      default:
+        return;
+    }
+
+    // -----------------------------------------
+    // DOB expression
+    // Supports:
+    // 12/5/2001
+    // 12/05/2001
+    // 16/05/00
+    // -----------------------------------------
+
+    const dobExpression = {
+      $cond: [
+        {
+          $eq: [
+            {
+              $strLenCP: {
+                $ifNull: ["$dateOfBirth", ""],
+              },
+            },
+            0,
+          ],
+        },
+
+        // Empty DOB → null
+        null,
+
+        // Otherwise parse DOB
+        {
+          $cond: [
+            {
+              $regexMatch: {
+                input: "$dateOfBirth",
+                regex: /^\d{1,2}\/\d{1,2}\/\d{2}$/,
+              },
+            },
+
+            // DD/MM/YY → DD/MM/20YY
+            {
+              $dateFromString: {
+                dateString: {
+                  $concat: [
+                    {
+                      $substrCP: [
+                        "$dateOfBirth",
+                        0,
+                        {
+                          $subtract: [
+                            {
+                              $strLenCP: "$dateOfBirth",
+                            },
+                            2,
+                          ],
+                        },
+                      ],
+                    },
+                    "20",
+                    {
+                      $substrCP: [
+                        "$dateOfBirth",
+                        {
+                          $subtract: [
+                            {
+                              $strLenCP: "$dateOfBirth",
+                            },
+                            2,
+                          ],
+                        },
+                        2,
+                      ],
+                    },
+                  ],
+                },
+                format: "%d/%m/%Y",
+                onError: null,
+                onNull: null,
+              },
+            },
+
+            // DD/MM/YYYY
+            {
+              $dateFromString: {
+                dateString: "$dateOfBirth",
+                format: "%d/%m/%Y",
+                onError: null,
+                onNull: null,
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    // -----------------------------------------
+    // 0 - 17
+    // -----------------------------------------
+
+    if (minAge !== undefined && maxAge !== undefined) {
+      const youngestDOB = new Date(today);
+      youngestDOB.setFullYear(
+        today.getFullYear() - minAge
+      );
+
+      const oldestDOB = new Date(today);
+      oldestDOB.setFullYear(
+        today.getFullYear() - (maxAge + 1)
+      );
+      oldestDOB.setDate(oldestDOB.getDate() + 1);
+
+      ageConditions.push({
+        $and: [
+          // DOB MUST EXIST
+          {
+            dateOfBirth: {
+              $exists: true,
+              $nin: ["", null],
+            },
+          },
+
+          {
+            $expr: {
+              $gte: [dobExpression, oldestDOB],
+            },
+          },
+
+          {
+            $expr: {
+              $lte: [dobExpression, youngestDOB],
+            },
+          },
+        ],
+      });
+    }
+
+    // -----------------------------------------
+    // 55+
+    // -----------------------------------------
+
+    else if (minAge !== undefined) {
+      const youngestDOB = new Date(today);
+
+      youngestDOB.setFullYear(
+        today.getFullYear() - minAge
+      );
+
+      ageConditions.push({
+        $and: [
+          // IMPORTANT:
+          // Exclude empty DOB
+          {
+            dateOfBirth: {
+              $exists: true,
+              $nin: ["", null],
+            },
+          },
+
+          {
+            $expr: {
+              $lte: [dobExpression, youngestDOB],
+            },
+          },
+        ],
+      });
+    }
+  });
+
+  if (ageConditions.length > 0) {
+    filter.$and = [
+      ...(filter.$and || []),
+      {
+        $or: ageConditions,
+      },
+    ];
+  }
+}
+
+
+
+
 // DATABASE QUERY
 // =====================
 
 // Count total matching records
 const total = await CsvCreator.countDocuments(filter);
+
+
+// ===============================
+// CREATOR DATA AVAILABILITY STATS
+// ===============================
+
+const statsResult = await CsvCreator.aggregate([
+  {
+    $match: filter,
+  },
+
+  {
+    $facet: {
+
+      // =====================================
+      // INSTAGRAM CREATORS
+      // =====================================
+      instagram: [
+        {
+          $match: {
+            $or: [
+              {
+                instagramUsername: {
+                  $exists: true,
+                  $nin: ["", null],
+                },
+              },
+              {
+                instagramProfileLink: {
+                  $exists: true,
+                  $nin: ["", null],
+                },
+              },
+            ],
+          },
+        },
+        {
+          $count: "count",
+        },
+      ],
+
+      // =====================================
+      // YOUTUBE CREATORS
+      // =====================================
+      youtube: [
+        {
+          $match: {
+            $or: [
+              {
+                youtubeUsername: {
+                  $exists: true,
+                  $nin: ["", null],
+                },
+              },
+              {
+                youtubeChannelLink: {
+                  $exists: true,
+                  $nin: ["", null],
+                },
+              },
+            ],
+          },
+        },
+        {
+          $count: "count",
+        },
+      ],
+
+      // =====================================
+      // MIXED
+      // BOTH INSTAGRAM + YOUTUBE
+      // =====================================
+      mixed: [
+        {
+          $match: {
+            $and: [
+              {
+                $or: [
+                  {
+                    instagramUsername: {
+                      $exists: true,
+                      $nin: ["", null],
+                    },
+                  },
+                  {
+                    instagramProfileLink: {
+                      $exists: true,
+                      $nin: ["", null],
+                    },
+                  },
+                ],
+              },
+
+              {
+                $or: [
+                  {
+                    youtubeUsername: {
+                      $exists: true,
+                      $nin: ["", null],
+                    },
+                  },
+                  {
+                    youtubeChannelLink: {
+                      $exists: true,
+                      $nin: ["", null],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        {
+          $count: "count",
+        },
+      ],
+
+      // =====================================
+      // UNIQUE CITIES
+      // =====================================
+      cities: [
+        {
+          $match: {
+            city: {
+              $exists: true,
+              $nin: ["", null],
+            },
+          },
+        },
+        {
+          $group: {
+            _id: "$city",
+          },
+        },
+        {
+          $count: "count",
+        },
+      ],
+
+      // =====================================
+      // UNIQUE REGIONS / STATES
+      // =====================================
+      regions: [
+        {
+          $match: {
+            state: {
+              $exists: true,
+              $nin: ["", null],
+            },
+          },
+        },
+        {
+          $group: {
+            _id: "$state",
+          },
+        },
+        {
+          $count: "count",
+        },
+      ],
+    },
+  },
+]);
+
+
+// ===============================
+// CONVERT AGGREGATION RESULT
+// ===============================
+
+const creatorStats = {
+  instagram:
+    statsResult[0]?.instagram?.[0]?.count || 0,
+
+  youtube:
+    statsResult[0]?.youtube?.[0]?.count || 0,
+
+  mixed:
+    statsResult[0]?.mixed?.[0]?.count || 0,
+
+  cities:
+    statsResult[0]?.cities?.[0]?.count || 0,
+
+  regions:
+    statsResult[0]?.regions?.[0]?.count || 0,
+};
 
 // ===============================
 // DOWNLOAD ALL FILTERED DATA
@@ -1617,6 +2056,7 @@ if (req.query.download === "true") {
   return res.status(200).json({
     success: true,
     total,
+     stats: creatorStats,
     data: creators,
   });
 
@@ -1638,6 +2078,7 @@ const creators = await CsvCreator.find(filter)
 return res.status(200).json({
   success: true,
   total,
+   stats: creatorStats,
   page: pageNumber,
   limit: limitNumber,
   totalPages: Math.ceil(total / limitNumber),
