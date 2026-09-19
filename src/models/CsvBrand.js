@@ -72,6 +72,11 @@ const csvBrandSchema = new mongoose.Schema(
       trim: true,
     },
 
+      // NEW: Category
+    category: {
+      type: String,
+      trim: true,
+    },
     status: {
       type: String,
       enum: [

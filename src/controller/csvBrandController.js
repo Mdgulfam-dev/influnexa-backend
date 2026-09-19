@@ -233,6 +233,10 @@ export const uploadBrandsCSV = async (req, res) => {
           dataType: cleanText(
             row["Data Type"]
           ),
+          category: cleanText(
+  row["Category"]
+),
+
 
           status:
             cleanText(row["Status"]) || "Pending",
@@ -476,6 +480,7 @@ console.log(
                       "ageOfCompany",
                       "websiteUrl",
                       "dataType",
+                      "category",
                       "status",
                     ];
 
