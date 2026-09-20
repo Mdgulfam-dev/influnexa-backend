@@ -159,6 +159,9 @@ const findDuplicateBrandsInCSV = (brands) => {
 
 export const uploadBrandsCSV = async (req, res) => {
   try {
+req.setTimeout(0);
+    res.setTimeout(0);
+    
     console.log("===== BRAND CSV UPLOAD START =====");
 
     if (!req.file) {
@@ -278,13 +281,26 @@ console.log(
           let successfulRecords = 0;
           let updatedRecords = 0;
           let failedRecords = 0;
+const limit = pLimit(25);
 
-          const limit = pLimit(25);
+const BATCH_SIZE = 1000;
 
-          await Promise.all(
-            brands.map((brand, index) =>
-              limit(async () => {
-                try {
+for (
+  let batchStart = 0;
+  batchStart < brands.length;
+  batchStart += BATCH_SIZE
+) {
+  const batch = brands.slice(
+    batchStart,
+    batchStart + BATCH_SIZE
+  );
+
+  await Promise.all(
+    batch.map((brand, batchIndex) =>
+      limit(async () => {
+        const index = batchStart + batchIndex;
+
+        try {
 
                   if (duplicateRows.has(index)) {
   const duplicates =
@@ -624,30 +640,6 @@ console.log(
                     );
 
                     successfulRecords++;
-
-                    report.push({
-                      row: index + 1,
-
-                      companyName:
-                        brand.companyName,
-
-                      fullName:
-                        brand.fullName,
-
-                      email:
-                        brand.email,
-
-                      officialEmail:
-                        brand.officialEmail,
-
-                      mobileNumber:
-                        brand.mobileNumber,
-
-                      status: "Uploaded",
-
-                      reason:
-                        "New brand added",
-                    });
                   }
                 } catch (error) {
                   failedRecords++;
@@ -679,31 +671,10 @@ console.log(
               })
             )
           );
+}
 
-          // ========================================
-          // REPORT SIZE
-          // ========================================
 
-          const reportSize =
-            Buffer.byteLength(
-              JSON.stringify(report),
-              "utf8"
-            );
-
-          console.log(
-            "BRAND REPORT SIZE:",
-            (
-              reportSize /
-              1024 /
-              1024
-            ).toFixed(2),
-            "MB"
-          );
-
-          console.log(
-            "BRAND REPORT ROWS:",
-            report.length
-          );
+          
 const filteredReport = report.filter(
   (item) =>
     item.status === "Failed" ||
@@ -720,11 +691,26 @@ console.log(
   "REPORT ROWS (FAILED + UPDATED):",
   filteredReport.length
 );
+
+
+
           // ========================================
           // SAVE REPORT
           // ========================================
+const REPORT_CHUNK_SIZE = 3000;
 
-          const savedReport =
+let savedReport = null;
+
+for (
+  let i = 0;
+  i < filteredReport.length;
+  i += REPORT_CHUNK_SIZE
+) {
+  const chunk = filteredReport.slice(
+    i,
+    i + REPORT_CHUNK_SIZE
+  );
+          const createdReport  =
             await CSVBrandUploadReport.create({
               fileName:
                 req.file.originalname,
@@ -736,9 +722,30 @@ console.log(
               updatedRecords,
 
               failedRecords,
-               report: filteredReport,
+               report: chunk,
              
             });
+
+             if (!savedReport) {
+    savedReport = createdReport;
+  }
+
+  console.log(
+    `BRAND REPORT CHUNK SAVED: ${
+      i + 1
+    } - ${
+      i + chunk.length
+    }`
+  );
+}
+
+console.log(
+  "TOTAL REPORT CHUNKS:",
+  Math.ceil(
+    filteredReport.length /
+      REPORT_CHUNK_SIZE
+  )
+);
 
           // ========================================
           // DELETE TEMP CSV
@@ -769,18 +776,13 @@ console.log(
             message:
               "Brand CSV uploaded successfully",
 
-            reportId:
-              savedReport._id,
-
             totalRecords,
 
             successfulRecords,
 
             updatedRecords,
 
-            failedRecords,
-
-            report: filteredReport,
+            failedRecords
           });
           
         } catch (error) {
@@ -939,13 +941,15 @@ export const updateCsvBrand = async (req, res) => {
 export const getLatestCSVBrandReport =
   async (req, res) => {
     try {
-      const report =
+      // Get the newest report chunk
+      const latestReport =
         await CSVBrandUploadReport.findOne()
           .sort({
             createdAt: -1,
-          });
+          })
+          .lean();
 
-      if (!report) {
+      if (!latestReport) {
         return res.json({
           success: true,
           report: null,
@@ -954,11 +958,68 @@ export const getLatestCSVBrandReport =
         });
       }
 
+      // Get all chunks belonging to the same upload
+      const reportChunks =
+        await CSVBrandUploadReport.find({
+          fileName:
+            latestReport.fileName,
+
+          totalRecords:
+            latestReport.totalRecords,
+
+          successfulRecords:
+            latestReport.successfulRecords,
+
+          updatedRecords:
+            latestReport.updatedRecords,
+
+          failedRecords:
+            latestReport.failedRecords,
+        })
+          .sort({
+            createdAt: 1,
+          })
+          .lean();
+
+      // Combine all report chunks
+      const combinedReport =
+        reportChunks.flatMap(
+          (chunk) =>
+            Array.isArray(chunk.report)
+              ? chunk.report
+              : []
+        );
+
       return res.json({
         success: true,
-        report,
+
+        report: {
+          fileName:
+            latestReport.fileName,
+
+          totalRecords:
+            latestReport.totalRecords || 0,
+
+          successfulRecords:
+            latestReport.successfulRecords || 0,
+
+          updatedRecords:
+            latestReport.updatedRecords || 0,
+
+          failedRecords:
+            latestReport.failedRecords || 0,
+
+          report:
+            combinedReport,
+        },
       });
+
     } catch (error) {
+      console.error(
+        "GET LATEST CSV BRAND REPORT ERROR:",
+        error
+      );
+
       return res.status(500).json({
         success: false,
         message:
@@ -966,7 +1027,6 @@ export const getLatestCSVBrandReport =
       });
     }
   };
-
 const escapeRegex = (value) => {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };
