@@ -951,15 +951,56 @@ console.log(
   filteredReport.length
 );
 
-// SAVE REPORT PERMANENTLY
-const savedReport = await CSVUploadReport.create({
-    fileName: req.file.originalname,
+
+
+// ========================================
+// SAVE REPORT IN CHUNKS
+// ========================================
+
+const REPORT_CHUNK_SIZE = 3000;
+
+for (
+  let i = 0;
+  i < filteredReport.length;
+  i += REPORT_CHUNK_SIZE
+) {
+  const chunk = filteredReport.slice(
+    i,
+    i + REPORT_CHUNK_SIZE
+  );
+
+  await CSVUploadReport.create({
+    fileName:
+      req.file.originalname,
+
     totalRecords,
+
     successfulRecords,
+
     updatedRecords,
+
     failedRecords,
-    report: filteredReport,
-});
+
+    report: chunk,
+  });
+
+  console.log(
+    `CREATOR REPORT CHUNK SAVED: ${
+      i + 1
+    } - ${
+      i + chunk.length
+    }`
+  );
+}
+
+console.log(
+  "TOTAL CREATOR REPORT CHUNKS:",
+  Math.ceil(
+    filteredReport.length /
+      REPORT_CHUNK_SIZE
+  )
+);
+
 
 
 fs.unlink(req.file.path, () => {});
@@ -984,9 +1025,7 @@ return res.status(200).json({
     successfulRecords,
     updatedRecords,
 
-    failedRecords,
-
-   report: filteredReport,
+    failedRecords
 });
         } catch (err) {
           console.error("INSERT ERROR:");
