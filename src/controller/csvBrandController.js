@@ -4,6 +4,7 @@ import CsvBrand from "../models/CsvBrand.js";
 import CSVBrandUploadReport  from "../models/CSVBrandUploadReport.js";
 import pLimit from "p-limit";
 import { io } from "../server.js";
+import LeadWorkflow from "../models/LeadWorkflow.js";
 
 // ========================================
 // CLEAN FUNCTIONS
@@ -833,15 +834,35 @@ console.log(
 // ========================================
 // UPDATE CSV BRAND STATUS
 // ========================================
+
 export const updateCsvBrand = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, completedBy } = req.body;
 
+    // ========================================
+    // FIND BRAND FIRST
+    // ========================================
+
+    const existingBrand = await CsvBrand.findById(id);
+
+    if (!existingBrand) {
+      return res.status(404).json({
+        success: false,
+        message: "CSV brand not found",
+      });
+    }
+
+    // ========================================
+    // STORE OLD STATUS BEFORE UPDATE
+    // ========================================
+
+    const oldStatus = existingBrand.status;
+
     const updateData = {};
 
     // ========================================
-    // UPDATE STATUS
+    // VALIDATE STATUS
     // ========================================
 
     if (status !== undefined) {
@@ -877,14 +898,17 @@ export const updateCsvBrand = async (req, res) => {
     // ========================================
 
     if (completedBy !== undefined) {
-      updateData.completedBy = completedBy || null;
+      updateData.completedBy =
+        completedBy || null;
     }
 
     // ========================================
     // NOTHING TO UPDATE
     // ========================================
 
-    if (Object.keys(updateData).length === 0) {
+    if (
+      Object.keys(updateData).length === 0
+    ) {
       return res.status(400).json({
         success: false,
         message: "No update data provided",
@@ -892,19 +916,33 @@ export const updateCsvBrand = async (req, res) => {
     }
 
     // ========================================
-    // UPDATE DATABASE
+    // CHECK WHETHER STATUS ACTUALLY CHANGED
     // ========================================
 
-    const brand = await CsvBrand.findByIdAndUpdate(
-      id,
-      {
-        $set: updateData,
-      },
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const statusChanged =
+      status !== undefined &&
+      String(oldStatus || "")
+        .trim()
+        .toLowerCase() !==
+        String(status || "")
+          .trim()
+          .toLowerCase();
+
+    // ========================================
+    // UPDATE BRAND
+    // ========================================
+
+    const brand =
+      await CsvBrand.findByIdAndUpdate(
+        id,
+        {
+          $set: updateData,
+        },
+        {
+          new: true,
+          runValidators: true,
+        }
+      );
 
     if (!brand) {
       return res.status(404).json({
@@ -913,9 +951,113 @@ export const updateCsvBrand = async (req, res) => {
       });
     }
 
+    // ========================================
+    // CREATE BRAND LEAD WORKFLOW EVENT
+    // ONLY WHEN STATUS ACTUALLY CHANGES
+    // ========================================
+
+    if (statusChanged) {
+      const workflowCompletedBy =
+        completedBy !== undefined
+          ? completedBy
+          : brand.completedBy;
+
+      // ======================================
+      // ONLY CREATE IF LEAD IS AVAILABLE
+      // ======================================
+
+      if (
+        workflowCompletedBy?.name ||
+        workflowCompletedBy?.email
+      ) {
+        try {
+          await LeadWorkflow.create({
+            leadId: brand._id,
+
+            status: String(status).trim(),
+
+            completedBy: {
+              name: String(
+                workflowCompletedBy?.name || ""
+              ).trim(),
+
+              email: String(
+                workflowCompletedBy?.email || ""
+              )
+                .trim()
+                .toLowerCase(),
+            },
+
+            completedAt: new Date(),
+          });
+
+          console.log(
+            "================================"
+          );
+
+          console.log(
+            "LEAD WORKFLOW CREATED"
+          );
+
+          console.log({
+            leadId: brand._id,
+            oldStatus,
+            newStatus: status,
+            completedBy: workflowCompletedBy,
+          });
+
+          console.log(
+            "================================"
+          );
+        } catch (workflowError) {
+          // ==================================
+          // DUPLICATE WORKFLOW
+          // ==================================
+
+          if (
+            workflowError?.code === 11000
+          ) {
+            console.log(
+              "Workflow already exists for this brand/status:",
+              brand._id,
+              status
+            );
+          } else {
+            // Do not fail the brand update
+            console.error(
+              "LEAD WORKFLOW CREATE ERROR:",
+              workflowError
+            );
+          }
+        }
+      } else {
+        console.log(
+          "Workflow not created because completedBy is missing."
+        );
+      }
+    }
+
+    // ========================================
+    // SOCKET UPDATE
+    // ========================================
+
+    if (io) {
+      io.emit(
+        "update-csv-brand",
+        brand
+      );
+    }
+
+    // ========================================
+    // RESPONSE
+    // ========================================
+
     return res.status(200).json({
       success: true,
-      message: "Brand updated successfully",
+
+      message:
+        "Brand updated successfully",
+
       data: brand,
     });
 
@@ -927,12 +1069,14 @@ export const updateCsvBrand = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to update CSV brand",
+
+      message:
+        "Failed to update CSV brand",
+
       error: error.message,
     });
   }
 };
-
 
 // ========================================
 // GET LATEST BRAND REPORT
@@ -1056,6 +1200,7 @@ export const getCsvBrands = async (req, res) => {
       status,
       contactStatus,
       completedBy,
+      category,
       actionButton,
       editStatus,
 
@@ -1490,6 +1635,25 @@ if (completedBy) {
   }
 }
 
+
+
+// ========================================
+// CATEGORY FILTER
+// ========================================
+
+if (category) {
+  const selectedCategories = category
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (selectedCategories.length > 0) {
+    filter.category = {
+      $in: selectedCategories,
+    };
+  }
+}
+
     // ========================================
     // ACTION BUTTON
     // ========================================
@@ -1682,12 +1846,14 @@ export const getCsvBrandFilterOptions = async (req, res) => {
       dataType,
       status,
       completedBy,
+      category
     ] = await Promise.all([
       CsvBrand.distinct("designation"),
       CsvBrand.distinct("ageOfCompany"),
       CsvBrand.distinct("dataType"),
       CsvBrand.distinct("status"),
-        CsvBrand.distinct("completedBy.name"),
+      CsvBrand.distinct("completedBy.name"),
+      CsvBrand.distinct("category"),
     ]);
 
     // Remove empty/null values and sort
@@ -1721,6 +1887,7 @@ export const getCsvBrandFilterOptions = async (req, res) => {
         dataType: cleanOptions(dataType),
         status: cleanOptions(status),
         completedBy: cleanOptions(completedBy),
+         category: cleanOptions(category),
       },
     });
 

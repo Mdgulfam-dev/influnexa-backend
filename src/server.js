@@ -12,6 +12,8 @@ import jobApplicationsRouter from "./routes/jobApplications.js";
 import jobsRouter from "./routes/jobs.js";
 import csvCreatorsRouter  from "./routes/csvRoutes.js"
 import csvBrandRoutes from "./routes/csvBrandRoutes.js"
+import leadWorkflowRouter from "./routes/leadWorkflow.js";
+
 dotenv.config();
 
 const app = express();
@@ -60,6 +62,7 @@ app.use(
     },
   })
 );
+// IMPORTANT: Parse JSON request bodies
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/api/health", (req, res) => {
@@ -77,6 +80,7 @@ app.use(
   "/api/csv-brands",
   csvBrandRoutes
 );
+app.use("/api/admin/lead-workflow", leadWorkflowRouter);
 
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
