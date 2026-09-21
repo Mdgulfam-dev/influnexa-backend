@@ -1,3 +1,3 @@
 # influnexa-backend
 
-Render URL:https://influnexa-backend-service.onrender.com
+Render URL:https://influnexa-backend-service.onrender.com/api/health
