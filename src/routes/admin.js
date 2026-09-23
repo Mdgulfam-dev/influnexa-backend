@@ -225,67 +225,240 @@ function followerRangeFilter(range) {
     ? { exactFollowers: ranges[range] }
     : {};
 }
+function getInfluencerTypeFilter(type) {
+  const ranges = {
+    "Nano Influencer": {
+      exactFollowers: {
+        $lt: 10000,
+      },
+    },
 
+    "Micro Influencer": {
+      exactFollowers: {
+        $gte: 10000,
+        $lt: 100000,
+      },
+    },
 
+    "Macro Influencer": {
+      exactFollowers: {
+        $gte: 100000,
+        $lt: 1000000,
+      },
+    },
+
+    "Mega Influencer": {
+      exactFollowers: {
+        $gte: 1000000,
+      },
+    },
+  };
+
+  return ranges[type] || {};
+}
+function platformFilter(platform) {
+  if (!platform) return {};
+
+  const value = String(platform).trim().toLowerCase();
+
+  if (value === "instagram") {
+    return {
+      $or: [
+        {
+          platform: {
+            $regex: /^instagram$/i,
+          },
+        },
+        {
+          instagramUsername: {
+            $exists: true,
+            $nin: ["", null],
+          },
+        },
+        {
+          instagramProfileLink: {
+            $exists: true,
+            $nin: ["", null],
+          },
+        },
+      ],
+    };
+  }
+
+  if (value === "youtube" || value === "you tube") {
+    return {
+      $or: [
+        {
+          platform: {
+            $regex: /^youtube$/i,
+          },
+        },
+        {
+          platform: {
+            $regex: /^you\s*tube$/i,
+          },
+        },
+        {
+          youtubeUsername: {
+            $exists: true,
+            $nin: ["", null],
+          },
+        },
+        {
+          youtubeChannelLink: {
+            $exists: true,
+            $nin: ["", null],
+          },
+        },
+      ],
+    };
+  }
+
+  return {};
+}
 function registrationFilter(query, type) {
   const isBrand = type === "brands";
-  const aliases = isBrand
-    ? { New: ["New", "new"], Contacted: ["Contacted", "contacted"], "Under Review": ["Under Review", "qualified"], Closed: ["Closed", "closed"] }
-    : {};
-  const facets = isBrand
-    ? { ...valuesFilter(query.country, "country"), ...valuesFilter(query.industry, "industry") }
-    : {
-      ...valuesFilter(query.country, "country"),
-      ...valuesFilter(query.state, "state"),
-      ...valuesFilter(query.location, "city"),
-      ...(query.platform
-  ? {
-      platform: {
-        $regex: escapeRegex(query.platform),
-        $options: "i",
-      },
-    }
-  : {}),
-      ...valuesFilter(query.category, "categories"),
-     ...(query.language
-  ? {
-      languages: {
-        $elemMatch: {
-          $regex: escapeRegex(query.language),
-          $options: "i",
-        },
-      },
-    }
-  : {}),
-      ...numericRangeFilter(query.followerMin, query.followerMax, "followerCount"),
-      ...followerRangeFilter(query.followerRange),
-       // Campaign Type
-      ...(query.campaignType
-        ? {
-            campaignType: {
-              $in: [query.campaignType],
-            },
-          }
-        : {}),
 
-      // Influencer Type
-      ...(query.influencerType
-        ? {
-            influencerType: query.influencerType,
-          }
-        : {}),
-      
-    };
+  const aliases = isBrand
+    ? {
+        New: ["New", "new"],
+        Contacted: ["Contacted", "contacted"],
+        "Under Review": ["Under Review", "qualified"],
+        Closed: ["Closed", "closed"],
+      }
+    : {};
+
+  const facets = isBrand
+    ? {
+        // BRAND FILTERS
+        ...valuesFilter(query.country, "country"),
+        ...valuesFilter(query.industry, "industry"),
+      }
+    : {
+        // INFLUENCER FILTERS
+        ...valuesFilter(query.country, "country"),
+        ...valuesFilter(query.state, "state"),
+        ...valuesFilter(query.location, "city"),
+
+        ...(query.platform
+          ? {
+              ...platformFilter(query.platform),
+            }
+          : {}),
+
+        ...valuesFilter(query.category, "categories"),
+
+        ...(query.language
+          ? {
+              languages: {
+                $elemMatch: {
+                  $regex: escapeRegex(query.language),
+                  $options: "i",
+                },
+              },
+            }
+          : {}),
+
+        ...numericRangeFilter(
+          query.followerMin,
+          query.followerMax,
+          "followerCount"
+        ),
+
+        ...followerRangeFilter(query.followerRange),
+
+        // Campaign Type
+        ...(query.campaignType
+          ? {
+              campaignType: {
+                $in: [query.campaignType],
+              },
+            }
+          : {}),
+
+        // Influencer Type
+        ...(query.influencerType
+          ? getInfluencerTypeFilter(query.influencerType)
+          : {}),
+      };
+
+  /*
+   * GLOBAL SEARCH
+   *
+   * BRAND:
+   *   Company Name
+   *   Email
+   *   Mobile Number
+   *
+   * INFLUENCER:
+   *   Full Name
+   *   Email
+   *   Mobile Number
+   */
+  const searchValue = String(query.search || "").trim();
+
+  const searchFilter = searchValue
+    ? isBrand
+      ? {
+          $or: [
+            {
+              companyName: {
+                $regex: escapeRegex(searchValue),
+                $options: "i",
+              },
+            },
+            {
+              email: {
+                $regex: escapeRegex(searchValue),
+                $options: "i",
+              },
+            },
+            {
+              phone: {
+                $regex: escapeRegex(searchValue),
+                $options: "i",
+              },
+            },
+          ],
+        }
+      : {
+          $or: [
+            {
+              fullName: {
+                $regex: escapeRegex(searchValue),
+                $options: "i",
+              },
+            },
+            {
+              email: {
+                $regex: escapeRegex(searchValue),
+                $options: "i",
+              },
+            },
+            {
+              phoneNumber: {
+                $regex: escapeRegex(searchValue),
+                $options: "i",
+              },
+            },
+          ],
+        }
+    : {};
 
   return {
-    // Text indexes keep broad registration searches off the full collection scan.
-    ...(String(query.search || "").trim() ? { $text: { $search: String(query.search).trim() } } : {}),
+    // Global Search
+    ...searchFilter,
+
+    // Status
     ...buildStatusFilter(query.status, aliases),
+
+    // Country / Industry / Influencer filters
     ...facets,
+
+    // Date filter
     ...dateRangeFilter(query),
   };
 }
-
 router.get("/registrations/:type", async (req, res, next) => {
   const { type } = req.params;
   if (!["brands", "influencers"].includes(type)) return res.status(404).json({ message: "Registration type not found." });
