@@ -838,7 +838,7 @@ console.log(
 export const updateCsvBrand = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, completedBy } = req.body;
+    const { status,completedBy } = req.body;
 
     // ========================================
     // FIND BRAND FIRST
@@ -893,6 +893,8 @@ export const updateCsvBrand = async (req, res) => {
       updateData.status = status;
     }
 
+
+    
     // ========================================
     // UPDATE COMPLETED BY
     // ========================================
@@ -927,7 +929,15 @@ export const updateCsvBrand = async (req, res) => {
         String(status || "")
           .trim()
           .toLowerCase();
+          
 
+          // ========================================
+// RESET REMINDER TIMER WHEN STATUS CHANGES
+// ========================================
+
+if (statusChanged) {
+  updateData.statusChangedAt = new Date();
+}
     // ========================================
     // UPDATE BRAND
     // ========================================
