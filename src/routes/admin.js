@@ -567,6 +567,11 @@ router.get("/dashboard", async (req, res, next) => {
       applicationStatusBreakdown,
       tickets,
       ticketStatusBreakdown,
+       latestJob,
+  latestApplication,
+  latestInfluencer,
+  latestBrand,
+  latestTicket,
        
     ] = await Promise.all([
       BrandRegistration.find(brandFilter).sort({ createdAt: -1 }).skip(brandPage.skip).limit(brandPage.limit).lean(),
@@ -580,9 +585,9 @@ router.get("/dashboard", async (req, res, next) => {
      CSVUploadReport.findOne()
   .sort({ createdAt: -1 })
   .lean(),
-      BlogPost.find().sort({ publishedAt: -1, createdAt: -1 }).limit(200),
-      Testimonial.find().sort({ createdAt: -1 }).limit(200),
-      AdminUser.find().sort({ createdAt: -1 }).limit(200),
+      BlogPost.find().sort({ publishedAt: -1, createdAt: -1 }).limit(200).lean(),
+      Testimonial.find().sort({ createdAt: -1 }).limit(200).lean(),
+      AdminUser.find().sort({ createdAt: -1 }).limit(200).lean(),
       Job.find().sort({ createdAt: -1 }).lean(),
       JobApplication.find(candidateFilter).sort({ createdAt: -1 }).skip(candidatePage.skip).limit(candidatePage.limit).lean(),
       Object.keys(candidateFilter).length ? JobApplication.countDocuments(candidateFilter) : JobApplication.estimatedDocumentCount(),
@@ -593,34 +598,32 @@ router.get("/dashboard", async (req, res, next) => {
       JobApplication.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
       BrandTicket.find().sort({ updatedAt: -1 }).limit(200).lean(),
       BrandTicket.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+
+        Job.findOne()
+    .sort({ createdAt: -1 })
+    .select("createdAt")
+    .lean(),
+
+  JobApplication.findOne()
+    .sort({ createdAt: -1 })
+    .select("createdAt")
+    .lean(),
+
+  InfluencerRegistration.findOne()
+    .sort({ createdAt: -1, _id: -1 })
+    .select("createdAt _id")
+    .lean(),
+
+  BrandRegistration.findOne()
+    .sort({ createdAt: -1, _id: -1 })
+    .select("createdAt _id")
+    .lean(),
+
+  BrandTicket.findOne()
+    .sort({ createdAt: -1 })
+    .select("createdAt")
+    .lean(),
     ]);
-
-const latestJob = await Job.findOne()
-  .sort({ createdAt: -1 })
-  .select("createdAt")
-  .lean();
-
-const latestApplication = await JobApplication.findOne()
-  .sort({ createdAt: -1 })
-  .select("createdAt")
-  .lean();
-
-const latestInfluencer = await InfluencerRegistration.findOne()
-  .sort({ createdAt: -1, _id: -1 })
-  .select("createdAt _id")
-  .lean();
-
-const latestBrand = await BrandRegistration.findOne()
-  .sort({ createdAt: -1, _id: -1 })
-  .select("createdAt _id")
-  .lean();
-
-const latestTicket = await BrandTicket.findOne()
-  .sort({ createdAt: -1 })
-  .select("createdAt")
-  .lean();
-
-
     res.json({
       stats: {
         brands: brandCount,
@@ -809,7 +812,7 @@ router.get("/users", async (req, res, next) => {
     const users = await AdminUser.find({
       status: "active",
     })
-      .select("_id name email role status")
+      .select("_id name email role status lastLoginAt")
       .sort({ name: 1 })
       .lean();
 
