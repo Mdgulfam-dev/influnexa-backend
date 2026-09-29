@@ -131,4 +131,49 @@ statusChangedAt: {
   }
 );
 
+// ========================================
+// CSV BRAND PERFORMANCE INDEXES
+// ========================================
+
+csvBrandSchema.index({ createdAt: -1 });
+
+csvBrandSchema.index({
+  status: 1,
+  createdAt: -1,
+});
+
+csvBrandSchema.index({
+  category: 1,
+  createdAt: -1,
+});
+
+csvBrandSchema.index({
+  designation: 1,
+  createdAt: -1,
+});
+
+csvBrandSchema.index({
+  "completedBy.name": 1,
+  createdAt: -1,
+});
+
+// ========================================
+// DUPLICATE CHECK INDEXES
+// ========================================
+
+
+
+
+
+
+
+csvBrandSchema.index({
+  linkedinProfile: 1,
+});
+
+csvBrandSchema.index({
+  websiteUrl: 1,
+});
+
+
 export default mongoose.model("CsvBrand", csvBrandSchema);
