@@ -5,7 +5,7 @@ import CSVBrandUploadReport  from "../models/CSVBrandUploadReport.js";
 import pLimit from "p-limit";
 import { io } from "../server.js";
 import LeadWorkflow from "../models/LeadWorkflow.js";
-
+import { cleanDesignation } from "../../utils/designationNormalizer.js";
 // ========================================
 // CLEAN FUNCTIONS
 // ========================================
@@ -47,9 +47,8 @@ const cleanPhone = (value) => {
     phone = Number(phone).toFixed(0);
   }
 
-  // Remove +91
-  phone = phone.replace(/^\+91/, "");
-
+// Keep ONLY the last 10 digits
+  phone = phone.slice(-10);
   return phone;
 };
 
@@ -194,9 +193,9 @@ req.setTimeout(0);
             row["Full Name"]
           ),
 
-          designation: cleanText(
-            row["Designation"]
-          ),
+         designation: cleanDesignation(
+  cleanText(row["Designation"])
+),
 
           email: cleanEmail(
             row["Email Id"]
@@ -641,7 +640,31 @@ for (
                     );
 
                     successfulRecords++;
-                  }
+                    report.push({
+    row: index + 1,
+
+    companyName:
+      brand.companyName,
+
+    fullName:
+      brand.fullName,
+
+    email:
+      brand.email,
+
+    officialEmail:
+      brand.officialEmail,
+
+    mobileNumber:
+      brand.mobileNumber,
+
+    status: "Uploaded",
+
+    reason:
+      "Brand uploaded successfully",
+  });
+
+  }
                 } catch (error) {
                   failedRecords++;
 
@@ -701,7 +724,38 @@ console.log(
 const REPORT_CHUNK_SIZE = 3000;
 
 let savedReport = null;
+if (filteredReport.length === 0) {
+  const createdReport =
+    await CSVBrandUploadReport.create({
+      fileName: req.file.originalname,
 
+      // SUMMARY CARD DATA
+      totalRecords,
+      successfulRecords,
+      updatedRecords,
+      failedRecords,
+
+      // NO DETAIL ROWS
+      report: [],
+    });
+
+  savedReport = createdReport;
+
+  console.log(
+    "ALL BRANDS SUCCESSFULLY UPLOADED"
+  );
+
+  console.log(
+    "SUMMARY REPORT SAVED WITHOUT DETAIL ROWS"
+  );
+}
+
+// ========================================
+// FAILED / UPDATED / SKIPPED RECORDS EXIST
+// SAVE DETAIL REPORT IN CHUNKS
+// ========================================
+
+else {
 for (
   let i = 0;
   i < filteredReport.length;
@@ -747,6 +801,7 @@ console.log(
       REPORT_CHUNK_SIZE
   )
 );
+}
 
           // ========================================
           // DELETE TEMP CSV
