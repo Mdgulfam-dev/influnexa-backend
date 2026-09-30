@@ -13,7 +13,7 @@ import jobsRouter from "./routes/jobs.js";
 import csvCreatorsRouter  from "./routes/csvRoutes.js"
 import csvBrandRoutes from "./routes/csvBrandRoutes.js"
 import leadWorkflowRouter from "./routes/leadWorkflow.js";
-
+import { startAdminAutoLogout } from "./services/adminAutoLogout.js";
 dotenv.config();
 
 const app = express();
@@ -95,6 +95,8 @@ app.use((error, req, res, next) => {
 
 connectDatabase()
   .then(() => {
+        // Start automatic admin logout scheduler
+    startAdminAutoLogout();
     server.listen(port, () => {
       console.log(`Influnexa API running on http://127.0.0.1:${port}`);
     });
