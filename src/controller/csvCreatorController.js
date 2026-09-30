@@ -956,76 +956,126 @@ console.log(
 // ========================================
 // SAVE REPORT IN CHUNKS
 // ========================================
-
 const REPORT_CHUNK_SIZE = 3000;
 
-for (
-  let i = 0;
-  i < filteredReport.length;
-  i += REPORT_CHUNK_SIZE
-) {
-  const chunk = filteredReport.slice(
-    i,
-    i + REPORT_CHUNK_SIZE
-  );
+let savedReport = null;
 
-  await CSVUploadReport.create({
-    fileName:
-      req.file.originalname,
+if (filteredReport.length === 0) {
+  const createdReport =
+    await CSVUploadReport.create({
+      fileName: req.file.originalname,
 
-    totalRecords,
+      // SUMMARY CARD DATA
+      totalRecords,
+      successfulRecords,
+      updatedRecords,
+      failedRecords,
 
-    successfulRecords,
+      // NO DETAIL ROWS
+      report: [],
+    });
 
-    updatedRecords,
-
-    failedRecords,
-
-    report: chunk,
-  });
+  savedReport = createdReport;
 
   console.log(
-    `CREATOR REPORT CHUNK SAVED: ${
-      i + 1
-    } - ${
-      i + chunk.length
-    }`
+    "ALL CREATORS SUCCESSFULLY UPLOADED"
+  );
+
+  console.log(
+    "SUMMARY REPORT SAVED WITHOUT DETAIL ROWS"
   );
 }
 
-console.log(
-  "TOTAL CREATOR REPORT CHUNKS:",
-  Math.ceil(
-    filteredReport.length /
-      REPORT_CHUNK_SIZE
-  )
-);
+// ========================================
+// FAILED / UPDATED / SKIPPED / UPLOADED
+// SAVE DETAIL REPORT IN CHUNKS
+// ========================================
 
+else {
+  for (
+    let i = 0;
+    i < filteredReport.length;
+    i += REPORT_CHUNK_SIZE
+  ) {
+    const chunk = filteredReport.slice(
+      i,
+      i + REPORT_CHUNK_SIZE
+    );
 
+    const createdReport =
+      await CSVUploadReport.create({
+        fileName:
+          req.file.originalname,
 
-fs.unlink(req.file.path, () => {});
+        totalRecords,
 
-if(io){
+        successfulRecords,
 
-io.emit(
-"new-csv-creator"
-);
+        updatedRecords,
 
+        failedRecords,
+
+        report: chunk,
+      });
+
+    if (!savedReport) {
+      savedReport = createdReport;
+    }
+
+    console.log(
+      `CREATOR REPORT CHUNK SAVED: ${
+        i + 1
+      } - ${
+        i + chunk.length
+      }`
+    );
+  }
+
+  console.log(
+    "TOTAL CREATOR REPORT CHUNKS:",
+    Math.ceil(
+      filteredReport.length /
+        REPORT_CHUNK_SIZE
+    )
+  );
 }
+
+// ========================================
+// DELETE TEMP CSV
+// ========================================
+
+fs.unlink(
+  req.file.path,
+  () => {}
+);
+
+// ========================================
+// SOCKET UPDATE
+// ========================================
+
+if (io) {
+  io.emit(
+    "new-csv-creator"
+  );
+}
+
+// ========================================
+// RESPONSE
+// ========================================
+
 return res.status(200).json({
+  success: true,
 
-    success: true,
+  message:
+    "CSV uploaded successfully",
 
-    message: "CSV uploaded successfully",
+  totalRecords,
 
-    reportId: savedReport._id,
+  successfulRecords,
 
-    totalRecords,
+  updatedRecords,
 
-    successfulRecords,
-    updatedRecords,
-
-    failedRecords
+  failedRecords,
 });
         } catch (err) {
           console.error("INSERT ERROR:");
