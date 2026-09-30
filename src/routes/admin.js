@@ -10,6 +10,7 @@ import BrandTicket, { ticketStatuses } from "../models/BrandTicket.js";
 import { sendApplicationStatusEmail } from "../services/sendgrid.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import CSVUploadReport from "../models/CSVUploadReport.js";
+import AdminLoginHistory from "../models/AdminLoginHistory.js";
 const router = express.Router();
 const generateInfluencerCode = async () => {
   const lastInfluencer = await InfluencerRegistration.findOne({
@@ -163,16 +164,25 @@ router.post("/login", async (req, res, next) => {
       });
       user.setPassword(password);
 
-      const token = createSessionToken();
-      user.sessionTokenHash = hashToken(token);
-      user.lastLoginAt = new Date();
-      await user.save();
+   const token = createSessionToken();
+user.sessionTokenHash = hashToken(token);
+user.lastLoginAt = new Date();
 
-      return res.json({
-        message: "Login successful.",
-        token,
-        user: publicUser(user),
-      });
+await user.save();
+
+// Record every login
+AdminLoginHistory.create({
+  adminUser: user._id,
+  action: "login",
+}).catch((error) => {
+  console.error("LOGIN HISTORY ERROR:", error);
+});
+
+return res.json({
+  message: "Login successful.",
+  token,
+  user: publicUser(user),
+});
     }
 
     if (!email) {
@@ -191,21 +201,136 @@ router.post("/login", async (req, res, next) => {
     }
 
     const token = createSessionToken();
-    user.sessionTokenHash = hashToken(token);
-    user.lastLoginAt = new Date();
-    await user.save();
+user.sessionTokenHash = hashToken(token);
+user.lastLoginAt = new Date();
 
-    return res.json({
-      message: "Login successful.",
-      token,
-      user: publicUser(user),
-    });
+await user.save();
+
+// Record every login
+await AdminLoginHistory.create({
+  adminUser: user._id,
+  action: "login",
+});
+
+return res.json({
+  message: "Login successful.",
+  token,
+  user: publicUser(user),
+});
   } catch (error) {
     return next(error);
   }
 });
 
 router.use(requireAdmin);
+// LOGIN HISTORY
+
+router.get("/users/:userId/login-history", async (req, res, next) => {
+  try {
+    const sevenDaysAgo = new Date(
+      Date.now() - 7 * 24 * 60 * 60 * 1000
+    );
+
+    const history = await AdminLoginHistory.find({
+      adminUser: req.params.userId,
+      createdAt: {
+        $gte: sevenDaysAgo,
+      },
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const historyWithDuration = [];
+
+    let loginTime = null;
+
+    for (const item of history) {
+      if (item.action === "login") {
+        loginTime = new Date(item.createdAt);
+
+        historyWithDuration.push({
+          ...item,
+          duration: null,
+          durationMinutes: null,
+        });
+      }
+
+      if (item.action === "logout") {
+        let durationMinutes = null;
+        let duration = null;
+
+        if (loginTime) {
+          const logoutTime = new Date(item.createdAt);
+
+          durationMinutes = Math.max(
+            0,
+            Math.round(
+              (logoutTime.getTime() - loginTime.getTime()) / 60000
+            )
+          );
+
+          const hours = Math.floor(durationMinutes / 60);
+          const minutes = durationMinutes % 60;
+
+          if (hours > 0 && minutes > 0) {
+            duration = `${hours}h ${minutes}m`;
+          } else if (hours > 0) {
+            duration = `${hours}h`;
+          } else {
+            duration = `${minutes}m`;
+          }
+        }
+
+        historyWithDuration.push({
+          ...item,
+          duration,
+          durationMinutes,
+        });
+
+        loginTime = null;
+      }
+    }
+
+    return res.json({
+      success: true,
+      history: historyWithDuration.reverse(),
+    });
+  } catch (error) {
+    console.error("GET LOGIN HISTORY ERROR:", error);
+    return next(error);
+  }
+});
+
+router.post("/logout", async (req, res, next) => {
+  try {
+    // Bootstrap ADMIN_TOKEN access is not stored in AdminUser,
+    // so there is no session to invalidate.
+    if (!req.adminUser?._id) {
+      return res.json({
+        success: true,
+        message: "Logged out successfully.",
+      });
+    }
+
+    await AdminLoginHistory.create({
+      adminUser: req.adminUser._id,
+      action: "logout",
+    });
+
+    // Invalidate the current session token.
+    req.adminUser.sessionTokenHash = undefined;
+    await req.adminUser.save();
+
+    return res.json({
+      success: true,
+      message: "Logged out successfully.",
+    });
+  } catch (error) {
+    console.error("ADMIN LOGOUT ERROR:", error);
+    return next(error);
+  }
+});
+
 
 function followerRangeFilter(range) {
   if (!range) return {};
