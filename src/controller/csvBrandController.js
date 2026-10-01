@@ -508,6 +508,19 @@ for (
                         let newValue =
                           brand[key];
 
+                           // ========================================
+  // DO NOT UPDATE EXISTING DATA WITH EMPTY DATA
+  // ========================================
+
+  if (
+    newValue === null ||
+    newValue === undefined ||
+    newValue === "" ||
+    (typeof newValue === "string" && !newValue.trim())
+  ) {
+    return;
+  }
+
                         if (
                           key ===
                             "email" ||
