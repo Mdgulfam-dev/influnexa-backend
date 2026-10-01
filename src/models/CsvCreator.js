@@ -253,7 +253,9 @@ creatorRating: {
     timestamps: true,
   }
   
+  
 );
+csvCreatorSchema.index({ createdAt: -1 });
 
 const CsvCreator =
   mongoose.models.CsvCreator ||
