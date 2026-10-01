@@ -61,14 +61,9 @@ const cleanPhone = (value)=>{
 
     }
 
-
-    // remove country code
-
-    phone = phone.replace("+91","");
-
-
-    return phone;
-
+// Keep ONLY the last 10 digits
+  phone = phone.slice(-10);
+  return phone;
 };
 
 const getInstagramFollowersRange = (followers) => {
@@ -734,6 +729,37 @@ let oldValue = existingCreator[key];
 
 let newValue = creator[key];
 
+if (
+  newValue === null ||
+  newValue === undefined ||
+  newValue === "" ||
+  (typeof newValue === "string" && !newValue.trim()) ||
+  (Array.isArray(newValue) && newValue.length === 0) ||
+
+  // Empty numeric values from CSV become 0
+  (
+    newValue === 0 &&
+    [
+      "exactFollowers",
+      "commercialsFor1InstagramReel",
+      "commercialsFor1InstagramStory",
+      "commercialsFor1InstagramPost",
+      "commercialsFor1DedicatedYouTubeVideo",
+      "commercialsFor1IntegratedYouTubeVideo",
+      "commercialsFor1DedicatedYouTubeShortsVideo",
+      "commercialsFor1IntegratedYouTubeShortsVideo",
+      "howManyAmazonReviewsYouDoPerMonth"
+    ].includes(key)
+  ) ||
+
+  // Empty Exact Followers generates "Nano Influencer"
+  (
+    key === "influencerType" &&
+    Number(creator.exactFollowers) === 0
+  )
+) {
+  return;
+}
 
 
 if(Array.isArray(oldValue)){
@@ -743,8 +769,6 @@ oldValue.sort()
 );
 
 }
-
-
 
 if(Array.isArray(newValue)){
 
@@ -1529,23 +1553,43 @@ if (platform) {
 
   const platformConditions = [];
 
-  if (selectedPlatforms.includes("Instagram")) {
-    platformConditions.push({
-      instagramProfileLink: {
-        $exists: true,
-        $nin: ["", null],
+if (selectedPlatforms.includes("Instagram")) {
+  platformConditions.push({
+    $or: [
+      {
+        instagramUsername: {
+          $exists: true,
+          $nin: ["", null],
+        },
       },
-    });
-  }
+      {
+        instagramProfileLink: {
+          $exists: true,
+          $nin: ["", null],
+        },
+      },
+    ],
+  });
+}
 
-  if (selectedPlatforms.includes("YouTube")) {
-    platformConditions.push({
-      youtubeChannelLink: {
-        $exists: true,
-        $nin: ["", null],
+if (selectedPlatforms.includes("YouTube")) {
+  platformConditions.push({
+    $or: [
+      {
+        youtubeUsername: {
+          $exists: true,
+          $nin: ["", null],
+        },
       },
-    });
-  }
+      {
+        youtubeChannelLink: {
+          $exists: true,
+          $nin: ["", null],
+        },
+      },
+    ],
+  });
+}
 
   if (platformConditions.length > 0) {
     filter.$and = [
@@ -1949,6 +1993,22 @@ if (age) {
 // Count total matching records
 const total = await CsvCreator.countDocuments(filter);
 
+// ===============================
+// DOWNLOAD ALL FILTERED DATA
+// ===============================
+if (req.query.download === "true") {
+
+ const creators = await CsvCreator.find(filter)
+  .sort({ createdAt: -1 })
+  .lean();
+
+  return res.status(200).json({
+    success: true,
+    total,
+    data: creators,
+  });
+
+}
 
 // ===============================
 // CREATOR DATA AVAILABILITY STATS
@@ -2134,22 +2194,7 @@ const creatorStats = {
     statsResult[0]?.regions?.[0]?.count || 0,
 };
 
-// ===============================
-// DOWNLOAD ALL FILTERED DATA
-// ===============================
-if (req.query.download === "true") {
 
-  const creators = await CsvCreator.find(filter)
-    .sort({ createdAt: -1 });
-
-  return res.status(200).json({
-    success: true,
-    total,
-     stats: creatorStats,
-    data: creators,
-  });
-
-}
 
 // ===============================
 // PAGINATION
@@ -2398,6 +2443,10 @@ export const getCsvFilterOptions = async (req, res) => {
 
 
   } catch (error) {
+    console.error("=================================");
+  console.error("GET CSV CREATORS ERROR");
+  console.error(error);
+  console.error("=================================");
 
     res.status(500).json({
       success: false,
