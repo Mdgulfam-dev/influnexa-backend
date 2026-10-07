@@ -13,6 +13,10 @@ import jobsRouter from "./routes/jobs.js";
 import csvCreatorsRouter  from "./routes/csvRoutes.js"
 import csvBrandRoutes from "./routes/csvBrandRoutes.js"
 import leadWorkflowRouter from "./routes/leadWorkflow.js";
+import AdminUser from "./models/AdminUser.js";
+import AdminLoginHistory from "./models/AdminLoginHistory.js";
+
+
 
 dotenv.config();
 
@@ -93,8 +97,51 @@ app.use((error, req, res, next) => {
   });
 });
 
+
+
+const scheduleMidnightLogout = () => {
+  const now = new Date();
+
+  const indiaNow = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+  );
+
+  const midnight = new Date(indiaNow);
+  midnight.setHours(24, 0, 0, 0);
+
+  const delay = midnight - indiaNow;
+
+  setTimeout(async () => {
+    try {
+      const users = await AdminUser.find({
+        status: "active",
+        sessionTokenHash: { $exists: true, $nin: [null, ""] },
+      });
+
+      for (const user of users) {
+        await AdminLoginHistory.create({
+          adminUser: user._id,
+          action: "logout",
+        });
+
+        user.sessionTokenHash = undefined;
+        await user.save();
+      }
+
+      console.log("All admin users automatically logged out at midnight.");
+    } catch (error) {
+      console.error("MIDNIGHT LOGOUT ERROR:", error);
+    }
+
+    scheduleMidnightLogout();
+  }, delay);
+};
+
+
+
 connectDatabase()
   .then(() => {
+    scheduleMidnightLogout();
     server.listen(port, () => {
       console.log(`Influnexa API running on http://127.0.0.1:${port}`);
     });

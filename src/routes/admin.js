@@ -11,6 +11,8 @@ import { sendApplicationStatusEmail } from "../services/sendgrid.js";
 import { requireAdmin } from "../middleware/adminAuth.js";
 import CSVUploadReport from "../models/CSVUploadReport.js";
 import AdminLoginHistory from "../models/AdminLoginHistory.js";
+import BrandTicketCreator from "../models/BrandTicketCreator.js";
+import CsvCreator from "../models/CsvCreator.js";
 const router = express.Router();
 const generateInfluencerCode = async () => {
   const lastInfluencer = await InfluencerRegistration.findOne({
@@ -826,6 +828,23 @@ async function nextTicketNumber() {
   return `BT-${String((Number.parseInt(latest?.ticketNumber?.slice(3) || "0", 10) + 1)).padStart(5, "0")}`;
 }
 
+
+router.get("/brand-tickets", async (req, res, next) => {
+  try {
+    const tickets = await BrandTicket.find()
+      .sort({ updatedAt: -1 })
+      .limit(200)
+      .lean();
+
+    return res.json({
+      success: true,
+      tickets,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post("/brand-tickets", async (req, res, next) => {
   try {
     const payload = ticketPayload(req.body); if (payload.error) return res.status(400).json({ message: payload.error });
@@ -846,6 +865,77 @@ router.patch("/brand-tickets/:id", async (req, res, next) => {
 router.delete("/brand-tickets/:id", async (req, res, next) => {
   try { const ticket = await BrandTicket.findByIdAndDelete(req.params.id); if (!ticket) return res.status(404).json({ message: "Brand ticket not found." }); return res.json({ message: "Brand ticket deleted." }); } catch (error) { return next(error); }
 });
+
+
+router.post("/brand-ticket-creators", async (req, res, next) => {
+  try {
+    const { brandTicketId, creatorIds } = req.body;
+
+    if (!brandTicketId || !creatorIds?.length) {
+      return res.status(400).json({
+        message: "Brand ticket and creators are required.",
+      });
+    }
+
+    const assignment = await BrandTicketCreator.findOneAndUpdate(
+      { brandTicketId },
+      {
+        $addToSet: {
+          creatorIds: { $each: creatorIds },
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+      }
+    );
+
+    return res.json({
+      success: true,
+      message: "Creators assigned successfully.",
+      assignment,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+
+router.get(
+  "/brand-ticket-creators/:brandTicketId",
+  async (req, res, next) => {
+    try {
+      const assignments = await BrandTicketCreator.find({
+        brandTicketId: req.params.brandTicketId,
+      })
+        .populate("creatorIds")
+        .lean();
+
+      const creatorMap = new Map();
+
+      assignments.forEach((assignment) => {
+        (assignment.creatorIds || []).forEach((creator) => {
+          if (creator?._id) {
+            creatorMap.set(
+              String(creator._id),
+              creator
+            );
+          }
+        });
+      });
+
+      return res.json({
+        success: true,
+        assignment: {
+          brandTicketId: req.params.brandTicketId,
+          creatorIds: Array.from(creatorMap.values()),
+        },
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
 
 function jobPayload(body, { includeJobId = false } = {}) {
   const fields = ["title", "department", "type", "location", "experience", "summary", "description"];
