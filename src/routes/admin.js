@@ -467,11 +467,13 @@ function registrationFilter(query, type) {
         ...valuesFilter(query.state, "state"),
         ...valuesFilter(query.location, "city"),
 
-        ...(query.platform
-          ? {
-              ...platformFilter(query.platform),
-            }
-          : {}),
+       ...(query.whatAllPlatformsAreYouAvailableOn
+  ? {
+      whatAllPlatformsAreYouAvailableOn: {
+        $in: [query.whatAllPlatformsAreYouAvailableOn],
+      },
+    }
+  : {}),
 
         ...valuesFilter(query.category, "categories"),
 
@@ -489,7 +491,7 @@ function registrationFilter(query, type) {
         ...numericRangeFilter(
           query.followerMin,
           query.followerMax,
-          "followerCount"
+            "exactFollowers"
         ),
 
         ...followerRangeFilter(query.followerRange),
@@ -586,6 +588,55 @@ function registrationFilter(query, type) {
     ...dateRangeFilter(query),
   };
 }
+
+
+router.get("/influencer-filter-options", async (req, res, next) => {
+  try {
+    const [
+      cities,
+      states,
+      countries,
+      categories,
+      languages,
+      platforms,
+    ] = await Promise.all([
+      InfluencerRegistration.distinct("city"),
+      InfluencerRegistration.distinct("state"),
+      InfluencerRegistration.distinct("country"),
+      InfluencerRegistration.distinct("categories"),
+      InfluencerRegistration.distinct("languages"),
+      InfluencerRegistration.distinct("whatAllPlatformsAreYouAvailableOn"),
+    ]);
+
+    const cleanOptions = (values) =>
+      [
+        ...new Set(
+          values
+            .flat(Infinity)
+            .filter((value) => typeof value === "string")
+            .map((value) => value.trim())
+            .filter(Boolean)
+        ),
+      ].sort((a, b) => a.localeCompare(b));
+
+    return res.json({
+      success: true,
+      options: {
+        cities: cleanOptions(cities),
+        states: cleanOptions(states),
+        countries: cleanOptions(countries),
+        categories: cleanOptions(categories),
+        languages: cleanOptions(languages),
+        platforms: cleanOptions(platforms),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+
+
 router.get("/registrations/:type", async (req, res, next) => {
   const { type } = req.params;
   if (!["brands", "influencers"].includes(type)) return res.status(404).json({ message: "Registration type not found." });
