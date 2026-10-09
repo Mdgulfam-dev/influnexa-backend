@@ -348,7 +348,25 @@ youtubeAverageViews:
           toNumber(
             body.commercialsFor1IntegratedYouTubeShortsVideo
           ),
+        // =====================================
+        // LINKEDIN
+        // =====================================
+        linkedinUsername:
+          normalizeText(body.linkedinUsername),
 
+        linkedinProfileLink:
+          normalizeText(body.linkedinProfileLink),
+
+        linkedinFollowersRange:
+          normalizeText(body.linkedinFollowersRange),
+
+        linkedinAverageViews:
+          toNumber(body.linkedinAverageViews),
+commercialsFor1LinkedInPost:
+toNumber(body.commercialsFor1LinkedInPost),
+
+        commercialsFor1LinkedInReel:
+          toNumber(body.commercialsFor1LinkedInReel),
         // =====================================
         // OTHER INFORMATION
         // =====================================
