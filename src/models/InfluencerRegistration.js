@@ -212,6 +212,41 @@ youtubeAverageViews: {
       default: 0,
     },
 
+        // LinkedIn
+    linkedinUsername: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    linkedinProfileLink: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    linkedinFollowersRange: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    linkedinAverageViews: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    commercialsFor1LinkedInPost:{
+type:Number,
+default:0,
+    },
+
+    commercialsFor1LinkedInReel: {
+      type: Number,
+      default: 0,
+    },
+
     // Other Information
     whatKindOfDealDoYouParticipateIn: {
       type: String,
