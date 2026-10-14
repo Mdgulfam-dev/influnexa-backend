@@ -14,6 +14,41 @@ const brandTicketCreatorSchema = new mongoose.Schema(
         ref: "CsvCreator",
       },
     ],
+
+     creatorDetails: [
+      {
+        creatorId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "CsvCreator",
+          required: true,
+        },
+
+        status: {
+          type: String,
+          enum: [
+            "",
+            "Approved",
+            "Rejected",
+            "Pending",
+            "On-Discussion",
+          ],
+          default: "",
+        },
+
+        readyToCampaign: {
+          type: String,
+          enum: ["", "Agreed", "Disagreed"],
+          default: "",
+        },
+
+        commercial: {
+          type: String,
+          default: "",
+        },
+
+      },
+    ],
+
   },
   { timestamps: true }
 );
