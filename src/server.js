@@ -16,8 +16,6 @@ import leadWorkflowRouter from "./routes/leadWorkflow.js";
 import AdminUser from "./models/AdminUser.js";
 import AdminLoginHistory from "./models/AdminLoginHistory.js";
 
-
-
 dotenv.config();
 
 const app = express();

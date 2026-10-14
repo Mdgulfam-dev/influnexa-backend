@@ -896,13 +896,35 @@ router.get("/brand-tickets", async (req, res, next) => {
   }
 });
 
+
 router.post("/brand-tickets", async (req, res, next) => {
   try {
-    const payload = ticketPayload(req.body); if (payload.error) return res.status(400).json({ message: payload.error });
-    const ticket = await BrandTicket.create({ ...payload.value, ticketNumber: await nextTicketNumber() });
+    const payload = ticketPayload(req.body);
+
+    if (payload.error) {
+      return res.status(400).json({ message: payload.error });
+    }
+
+    const loggedInUser = req.adminUser;
+
+    const ticket = await BrandTicket.create({
+      ...payload.value,
+      ticketNumber: await nextTicketNumber(),
+      createdByEmail:
+        loggedInUser?.email ||
+        req.body.createdByEmail ||
+        "",
+    });
+
     return res.status(201).json({ ticket });
-  } catch (error) { return next(error); }
+  } catch (error) {
+    return next(error);
+  }
 });
+
+
+
+
 
 router.patch("/brand-tickets/:id", async (req, res, next) => {
   try {
@@ -963,6 +985,7 @@ router.get(
         .lean();
 
       const creatorMap = new Map();
+       const detailsMap = new Map();
 
       assignments.forEach((assignment) => {
         (assignment.creatorIds || []).forEach((creator) => {
@@ -973,13 +996,32 @@ router.get(
             );
           }
         });
+
+        (assignment.creatorDetails || []).forEach((detail) => {
+          if (detail?.creatorId) {
+            detailsMap.set(String(detail.creatorId), detail);
+          }
+        });
+      });
+
+      const creators = Array.from(creatorMap.values()).map((creator) => {
+        const saved = detailsMap.get(String(creator._id));
+
+        return {
+          ...creator,
+          assignedStatus: saved?.status || "Pending",
+          readyToCampaign: saved?.readyToCampaign || "",
+          commercial: saved?.commercial || "",
+        };
+
+        
       });
 
       return res.json({
         success: true,
         assignment: {
           brandTicketId: req.params.brandTicketId,
-          creatorIds: Array.from(creatorMap.values()),
+          creatorIds: creators,
         },
       });
     } catch (error) {
@@ -987,6 +1029,115 @@ router.get(
     }
   }
 );
+
+
+
+router.put(
+  "/brand-ticket-creators/:brandTicketId/creator/:creatorId",
+  async (req, res, next) => {
+    try {
+      const { brandTicketId, creatorId } = req.params;
+      const { status, readyToCampaign, commercial } = req.body;
+
+      const allowedStatus = [
+        "",
+        "Approved",
+        "Rejected",
+        "Pending",
+        "On-Discussion",
+      ];
+
+      const allowedReadyStatus = ["", "Agreed", "Disagreed"];
+
+      // Validate status values
+      if (
+        status !== undefined &&
+        !allowedStatus.includes(status)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid creator status.",
+        });
+      }
+
+      if (
+        readyToCampaign !== undefined &&
+        !allowedReadyStatus.includes(readyToCampaign)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Ready to Campaign value.",
+        });
+      }
+
+      // Confirm the creator is assigned to this ticket
+      const assignment = await BrandTicketCreator.findOne({
+        brandTicketId,
+        creatorIds: creatorId,
+      });
+
+      if (!assignment) {
+        return res.status(404).json({
+          success: false,
+          message: "Creator is not assigned to this brand ticket.",
+        });
+      }
+
+      // Find the saved creator details
+      let detail = assignment.creatorDetails.find(
+        (item) =>
+          String(item.creatorId) === String(creatorId)
+      );
+
+      // Create the details entry if it does not exist
+      if (!detail) {
+        assignment.creatorDetails.push({
+          creatorId,
+          status: "",
+          readyToCampaign: "",
+          commercial: "",
+        });
+
+        detail = assignment.creatorDetails[
+          assignment.creatorDetails.length - 1
+        ];
+      }
+
+      // Update only the fields sent by the frontend
+      if (status !== undefined) {
+        detail.status = status;
+      }
+
+      if (readyToCampaign !== undefined) {
+        detail.readyToCampaign = readyToCampaign;
+      }
+
+      if (commercial !== undefined) {
+        detail.commercial = String(commercial);
+      }
+
+      // Persist changes to MongoDB
+      await assignment.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Creator details saved successfully.",
+        creator: {
+          creatorId: String(creatorId),
+          status: detail.status,
+          readyToCampaign: detail.readyToCampaign,
+          commercial: detail.commercial,
+        },
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
+
+
+
 
 function jobPayload(body, { includeJobId = false } = {}) {
   const fields = ["title", "department", "type", "location", "experience", "summary", "description"];
@@ -1213,6 +1364,70 @@ router.delete("/users/:id", async (req, res, next) => {
     next(error);
   }
 });
+
+
+
+
+// Change password API for BRAND accounts only
+router.patch("/brand/me/password", async (req, res, next) => {
+  try {
+    if (!req.adminUser?._id) {
+      return res.status(403).json({
+        message: "Authentication is required.",
+      });
+    }
+
+    if (String(req.adminUser.role || "").toLowerCase() !== "brand") {
+      return res.status(403).json({
+        message: "Only brand accounts can use this API.",
+      });
+    }
+
+    const { currentPassword, password } = req.body;
+
+    if (!currentPassword || !password) {
+      return res.status(400).json({
+        message: "Current password and new password are required.",
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 8 characters.",
+      });
+    }
+
+    const user = await AdminUser.findById(req.adminUser._id);
+
+    if (
+      !user ||
+      user.status !== "active" ||
+      String(user.role || "").toLowerCase() !== "brand"
+    ) {
+      return res.status(404).json({
+        message: "Active brand account not found.",
+      });
+    }
+
+    if (!user.verifyPassword(currentPassword)) {
+      return res.status(401).json({
+        message: "Current password is incorrect.",
+      });
+    }
+
+    user.setPassword(password);
+    await user.save();
+
+    return res.json({
+      message: "Brand password updated successfully.",
+      user: publicUser(user),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+
 
 router.patch("/brands/:id/status", async (req, res, next) => {
   try {

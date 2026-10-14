@@ -27,6 +27,11 @@ const brandTicketSchema = new mongoose.Schema(
       conversions: { type: Number, min: 0, default: 0 },
       spend: { type: Number, min: 0, default: 0 },
     },
+
+createdByEmail: {
+  type: String,
+  default: "",
+},
   },
   { timestamps: true }
 );
