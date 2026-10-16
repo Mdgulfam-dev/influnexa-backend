@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import AdminUser, { createSessionToken, hashToken } from "../models/AdminUser.js";
 import BlogPost from "../models/BlogPost.js";
 import BrandRegistration from "../models/BrandRegistration.js";
@@ -13,6 +14,7 @@ import CSVUploadReport from "../models/CSVUploadReport.js";
 import AdminLoginHistory from "../models/AdminLoginHistory.js";
 import BrandTicketCreator from "../models/BrandTicketCreator.js";
 import CsvCreator from "../models/CsvCreator.js";
+import Campaign from "../models/Campaign.js";
 const router = express.Router();
 const generateInfluencerCode = async () => {
   const lastInfluencer = await InfluencerRegistration.findOne({
@@ -1136,6 +1138,74 @@ router.put(
 );
 
 
+router.delete(
+  "/brand-ticket-creators/:brandTicketId/creator/:creatorId",
+  async (req, res) => {
+    try {
+      const { brandTicketId, creatorId } = req.params;
+
+      if (
+        !mongoose.isValidObjectId(brandTicketId) ||
+        !mongoose.isValidObjectId(creatorId)
+      ) {
+        return res.status(400).json({
+          message: "Invalid brand ticket or creator ID.",
+        });
+      }
+
+      const assignment = await BrandTicketCreator.findOne({
+        brandTicketId,
+      });
+
+      if (!assignment) {
+        return res.status(404).json({
+          message: "Assignment not found.",
+        });
+      }
+
+      const creatorDetail = assignment.creatorDetails.find(
+        (item) => String(item.creatorId) === creatorId
+      );
+
+      const creatorExistsInIds = assignment.creatorIds.some(
+        (id) => String(id) === creatorId
+      );
+
+      if (!creatorDetail && !creatorExistsInIds) {
+        return res.status(404).json({
+          message: "Creator is not assigned to this brand ticket.",
+        });
+      }
+
+      if (creatorDetail?.status === "Approved") {
+        return res.status(400).json({
+          message: "Approved creators cannot be deleted.",
+        });
+      }
+
+      assignment.creatorIds = assignment.creatorIds.filter(
+        (id) => String(id) !== creatorId
+      );
+
+      assignment.creatorDetails = assignment.creatorDetails.filter(
+        (item) => String(item.creatorId) !== creatorId
+      );
+
+      await assignment.save();
+
+      return res.status(200).json({
+        message: "Creator removed from this brand ticket.",
+      });
+    } catch (error) {
+      console.error("Delete assigned creator error:", error);
+
+      return res.status(500).json({
+        message: "Failed to remove creator assignment.",
+        error: error.message,
+      });
+    }
+  }
+);
 
 
 
@@ -1494,6 +1564,50 @@ router.patch("/testimonials/:id/status", async (req, res, next) => {
     res.json({ message: "Testimonial status updated.", testimonial });
   } catch (error) {
     next(error);
+  }
+});
+
+// Save a campaign
+router.post("/campaigns", async (req, res) => {
+  try {
+    const { name, description, link } = req.body;
+
+    if (!name?.trim() || !link?.trim()) {
+      return res.status(400).json({
+        message: "Campaign name and link are required",
+      });
+    }
+
+    const campaign = await Campaign.create({
+      name: name.trim(),
+      description: description?.trim() || "",
+      link: link.trim(),
+    });
+
+    return res.status(201).json(campaign);
+  } catch (error) {
+    console.error("SAVE CAMPAIGN ERROR:", error);
+
+    return res.status(500).json({
+      message: "Failed to save campaign",
+    });
+  }
+});
+
+// Get all saved campaigns
+router.get("/campaigns", async (req, res) => {
+  try {
+    const campaigns = await Campaign.find()
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json(campaigns);
+  } catch (error) {
+    console.error("GET CAMPAIGNS ERROR:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch campaigns",
+    });
   }
 });
 
