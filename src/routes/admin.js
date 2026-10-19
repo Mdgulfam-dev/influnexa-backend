@@ -1627,4 +1627,27 @@ router.delete("/testimonials/:id", async (req, res, next) => {
   }
 });
 
+
+
+router.delete("/campaigns/:id", async (req, res, next) => {
+  try {
+    const campaign = await Campaign.findById(req.params.id);
+
+    if (!campaign) {
+      return res.status(404).json({
+        message: "Campaign not found.",
+      });
+    }
+
+    await campaign.deleteOne();
+
+    return res.json({
+      message: "Campaign deleted successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
 export default router;
