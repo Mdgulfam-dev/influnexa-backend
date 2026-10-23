@@ -2270,48 +2270,34 @@ export const getCsvFilterOptions = async (req, res) => {
     // =========================================
 
     const [
-      genderData,
-      stateData,
-      countryData,
-      categoriesData,
-      languagesData,
-      campaignTypeData,
-      typeOfCelebData,
-      platformData,
-      youtubeSubscribersRangeData,
-      instagramUsernameData,
-      instagramProfileLinkData,
-      youtubeUsernameData,
-      youtubeChannelLinkData,
-    ] = await Promise.all([
-
-      CsvCreator.distinct("gender"),
-
-      CsvCreator.distinct("state"),
-
-      CsvCreator.distinct("country"),
-
-      CsvCreator.distinct("categories"),
-
-      CsvCreator.distinct("languages"),
-
-      CsvCreator.distinct("campaignType"),
-
-      CsvCreator.distinct("typeOfCeleb"),
-
-      CsvCreator.distinct("platform"),
-
-      CsvCreator.distinct("youtubeSubscribersRange"),
-
-      CsvCreator.distinct("instagramUsername"),
-
-      CsvCreator.distinct("instagramProfileLink"),
-
-      CsvCreator.distinct("youtubeUsername"),
-
-      CsvCreator.distinct("youtubeChannelLink"),
-
-    ]);
+  genderData,
+  stateData,
+  countryData,
+  categoriesData,
+  languagesData,
+  campaignTypeData,
+  typeOfCelebData,
+  platformData,
+  youtubeSubscribersRangeData,
+  hasInstagramUsername,
+  hasInstagramProfileLink,
+  hasYoutubeUsername,
+  hasYoutubeChannelLink,
+] = await Promise.all([
+  CsvCreator.distinct("gender"),
+  CsvCreator.distinct("state"),
+  CsvCreator.distinct("country"),
+  CsvCreator.distinct("categories"),
+  CsvCreator.distinct("languages"),
+  CsvCreator.distinct("campaignType"),
+  CsvCreator.distinct("typeOfCeleb"),
+  CsvCreator.distinct("platform"),
+  CsvCreator.distinct("youtubeSubscribersRange"),
+  CsvCreator.exists({ instagramUsername: { $regex: /\S/ } }),
+  CsvCreator.exists({ instagramProfileLink: { $regex: /\S/ } }),
+  CsvCreator.exists({ youtubeUsername: { $regex: /\S/ } }),
+  CsvCreator.exists({ youtubeChannelLink: { $regex: /\S/ } }),
+]);
 
 
     const unique = (arr) =>
@@ -2362,43 +2348,17 @@ export const getCsvFilterOptions = async (req, res) => {
     // Detect Instagram from Instagram details
     // =========================================
 
-    if (
-      instagramUsernameData.some(
-        value => value && String(value).trim() !== ""
-      )
-    ) {
-      platformSet.add("Instagram");
-    }
-
-    if (
-      instagramProfileLinkData.some(
-        value => value && String(value).trim() !== ""
-      )
-    ) {
-      platformSet.add("Instagram");
-    }
-
+ if (hasInstagramUsername || hasInstagramProfileLink) {
+  platformSet.add("Instagram");
+}
 
     // =========================================
     // Detect YouTube from YouTube details
     // =========================================
 
-    if (
-      youtubeUsernameData.some(
-        value => value && String(value).trim() !== ""
-      )
-    ) {
-      platformSet.add("YouTube");
-    }
-
-    if (
-      youtubeChannelLinkData.some(
-        value => value && String(value).trim() !== ""
-      )
-    ) {
-      platformSet.add("YouTube");
-    }
-
+if (hasYoutubeUsername || hasYoutubeChannelLink) {
+  platformSet.add("YouTube");
+}
 
     // =========================================
     // SAME RESPONSE STRUCTURE

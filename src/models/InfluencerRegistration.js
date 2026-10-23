@@ -247,6 +247,42 @@ default:0,
       default: 0,
     },
 
+
+    // Facebook
+    facebookUsername: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    facebookProfileLink: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    facebookFollowersRange: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    facebookAverageViews: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    commercialsFor1FacebookPost: {
+      type: Number,
+      default: 0,
+    },
+
+    commercialsFor1FacebookReel: {
+      type: Number,
+      default: 0,
+    },
+
     // Other Information
     whatKindOfDealDoYouParticipateIn: {
       type: String,

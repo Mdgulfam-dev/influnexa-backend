@@ -81,10 +81,30 @@ function dateRangeFilter(query, field = "createdAt") {
   return Object.keys(range).length ? { [field]: range } : {};
 }
 
-function valuesFilter(value, field) {
-  const values = String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
-  return values.length ? { [field]: { $in: values } } : {};
-}
+
+const multiSelectValues = (value) => {
+  if (!value) return [];
+
+  const values = Array.isArray(value)
+    ? value
+    : String(value).split(",");
+
+  return [...new Set(
+    values
+      .map((item) => String(item).trim())
+      .filter(Boolean)
+  )];
+};
+
+const valuesFilter = (value, field) => {
+  const values = multiSelectValues(value);
+
+  if (!values.length) return {};
+
+  return {
+    [field]: { $in: values },
+  };
+};
 
 function numericRangeFilter(minValue, maxValue, field) {
   const range = {};
@@ -445,6 +465,168 @@ function platformFilter(platform) {
 
   return {};
 }
+
+
+
+
+function buildInfluencerAgeFilter(age) {
+  if (!age) return {};
+
+  const selectedAges = String(age)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Supports DD/MM/YYYY, DD/MM/YY and YYYY-MM-DD.
+  const dobExpression = {
+    $switch: {
+      branches: [
+        {
+          // ISO date: YYYY-MM-DD
+          case: {
+            $regexMatch: {
+              input: { $ifNull: ["$dateOfBirth", ""] },
+              regex: /^\d{4}-\d{1,2}-\d{1,2}$/,
+            },
+          },
+          then: {
+            $dateFromString: {
+              dateString: "$dateOfBirth",
+              format: "%Y-%m-%d",
+              onError: null,
+              onNull: null,
+            },
+          },
+        },
+        {
+          // Two-digit year: DD/MM/YY (assumes 20YY)
+          case: {
+            $regexMatch: {
+              input: { $ifNull: ["$dateOfBirth", ""] },
+              regex: /^\d{1,2}\/\d{1,2}\/\d{2}$/,
+            },
+          },
+          then: {
+            $dateFromString: {
+              dateString: {
+                $concat: [
+                  {
+                    $substrCP: [
+                      "$dateOfBirth",
+                      0,
+                      {
+                        $subtract: [
+                          { $strLenCP: "$dateOfBirth" },
+                          2,
+                        ],
+                      },
+                    ],
+                  },
+                  "20",
+                  {
+                    $substrCP: [
+                      "$dateOfBirth",
+                      {
+                        $subtract: [
+                          { $strLenCP: "$dateOfBirth" },
+                          2,
+                        ],
+                      },
+                      2,
+                    ],
+                  },
+                ],
+              },
+              format: "%d/%m/%Y",
+              onError: null,
+              onNull: null,
+            },
+          },
+        },
+      ],
+      default: {
+        $dateFromString: {
+          dateString: { $ifNull: ["$dateOfBirth", ""] },
+          format: "%d/%m/%Y",
+          onError: null,
+          onNull: null,
+        },
+      },
+    },
+  };
+
+  const ageConditions = [];
+
+  for (const ageRange of selectedAges) {
+    let minAge;
+    let maxAge;
+
+    switch (ageRange) {
+      case "Under 18":
+        minAge = 0;
+        maxAge = 17;
+        break;
+      case "18 - 24":
+        minAge = 18;
+        maxAge = 24;
+        break;
+      case "25 - 34":
+        minAge = 25;
+        maxAge = 34;
+        break;
+      case "35 - 44":
+        minAge = 35;
+        maxAge = 44;
+        break;
+      case "45 - 54":
+        minAge = 45;
+        maxAge = 54;
+        break;
+      case "55+":
+        minAge = 55;
+        break;
+      default:
+        continue;
+    }
+
+    // DOB must exist and be non-empty.
+    const validDob = {
+      dateOfBirth: { $exists: true, $nin: ["", null] },
+    };
+
+    // Age N means DOB is after the N+1-year cutoff
+    // and on or before the N-year cutoff.
+    const youngestDOB = new Date(today);
+    youngestDOB.setFullYear(today.getFullYear() - minAge);
+
+    const conditions = [
+      validDob,
+      { $expr: { $lte: [dobExpression, youngestDOB] } },
+    ];
+
+    if (maxAge !== undefined) {
+      const oldestDOB = new Date(today);
+      oldestDOB.setFullYear(today.getFullYear() - (maxAge + 1));
+      oldestDOB.setDate(oldestDOB.getDate() + 1);
+
+      conditions.push({
+        $expr: { $gte: [dobExpression, oldestDOB] },
+      });
+    }
+
+    ageConditions.push({ $and: conditions });
+  }
+
+  return ageConditions.length
+    ? { $and: [{ $or: ageConditions }] }
+    : {};
+}
+
+
+
 function registrationFilter(query, type) {
   const isBrand = type === "brands";
 
@@ -463,55 +645,107 @@ function registrationFilter(query, type) {
         ...valuesFilter(query.country, "country"),
         ...valuesFilter(query.industry, "industry"),
       }
+    
     : {
         // INFLUENCER FILTERS
         ...valuesFilter(query.country, "country"),
         ...valuesFilter(query.state, "state"),
         ...valuesFilter(query.location, "city"),
 
-       ...(query.whatAllPlatformsAreYouAvailableOn
-  ? {
-      whatAllPlatformsAreYouAvailableOn: {
-        $in: [query.whatAllPlatformsAreYouAvailableOn],
-      },
-    }
-  : {}),
+        // Platform — supports multiple selections
+        ...(multiSelectValues(
+          query.whatAllPlatformsAreYouAvailableOn
+        ).length
+          ? {
+              whatAllPlatformsAreYouAvailableOn: {
+                $in: multiSelectValues(
+                  query.whatAllPlatformsAreYouAvailableOn
+                ),
+              },
+            }
+          : {}),
 
+        // Category
         ...valuesFilter(query.category, "categories"),
 
-        ...(query.language
+        // Language — supports multiple selections
+        ...(multiSelectValues(query.language).length
           ? {
               languages: {
                 $elemMatch: {
-                  $regex: escapeRegex(query.language),
-                  $options: "i",
+                  $in: multiSelectValues(query.language).map(
+                    (value) => new RegExp(escapeRegex(value), "i")
+                  ),
                 },
               },
             }
           : {}),
 
+        // Numeric follower limits
         ...numericRangeFilter(
           query.followerMin,
           query.followerMax,
-            "exactFollowers"
+          "exactFollowers"
         ),
 
-        ...followerRangeFilter(query.followerRange),
+        // Instagram follower range — supports multiple selections
+        ...(multiSelectValues(query.followerRange).length
+          ? {
+              $or: multiSelectValues(query.followerRange)
+                .map((range) => followerRangeFilter(range))
+                .filter((item) => Object.keys(item).length > 0)
+                .map((item) => item.exactFollowers)
+                .map((range) => ({ exactFollowers: range })),
+            }
+          : {}),
 
         // Campaign Type
-        ...(query.campaignType
+        ...valuesFilter(query.campaignType, "campaignType"),
+
+        // Influencer Type
+        ...(multiSelectValues(query.influencerType).length
           ? {
-              campaignType: {
-                $in: [query.campaignType],
+              $or: multiSelectValues(query.influencerType)
+                .map((value) => getInfluencerTypeFilter(value))
+                .filter((item) => Object.keys(item).length > 0),
+            }
+          : {}),
+
+        // Instagram Average Views
+        ...(multiSelectValues(query.instagramAverageViews).length
+          ? {
+              instagramAverageViews: {
+                $in: multiSelectValues(query.instagramAverageViews)
+                  .map(Number)
+                  .filter(Number.isFinite),
               },
             }
           : {}),
 
-        // Influencer Type
-        ...(query.influencerType
-          ? getInfluencerTypeFilter(query.influencerType)
+        // Gender
+        ...valuesFilter(query.gender, "gender"),
+
+        // YouTube Subscriber Range
+        ...valuesFilter(
+          query.youtubeSubscribersRange,
+          "youtubeSubscribersRange"
+        ),
+
+        // YouTube Average Views
+        ...(multiSelectValues(query.youtubeAverageViews).length
+          ? {
+              youtubeAverageViews: {
+                $in: multiSelectValues(query.youtubeAverageViews)
+                  .map(Number)
+                  .filter(Number.isFinite),
+              },
+            }
           : {}),
+
+        // Age range
+        ...buildInfluencerAgeFilter(query.age),
       };
+
 
   /*
    * GLOBAL SEARCH
@@ -601,6 +835,12 @@ router.get("/influencer-filter-options", async (req, res, next) => {
       categories,
       languages,
       platforms,
+       instagramAverageViews,
+      genders,
+      youtubeSubscribersRanges,
+      youtubeAverageViews,
+      dateOfBirths,
+    
     ] = await Promise.all([
       InfluencerRegistration.distinct("city"),
       InfluencerRegistration.distinct("state"),
@@ -608,7 +848,34 @@ router.get("/influencer-filter-options", async (req, res, next) => {
       InfluencerRegistration.distinct("categories"),
       InfluencerRegistration.distinct("languages"),
       InfluencerRegistration.distinct("whatAllPlatformsAreYouAvailableOn"),
+       // NEW: Instagram average views
+      InfluencerRegistration.distinct("instagramAverageViews", {
+        instagramAverageViews: { $gt: 0 },
+      }),
+
+      // NEW: Gender
+      InfluencerRegistration.distinct("gender", {
+        gender: { $nin: ["", null] },
+      }),
+
+      // NEW: YouTube subscriber range
+      InfluencerRegistration.distinct("youtubeSubscribersRange", {
+        youtubeSubscribersRange: { $nin: ["", null] },
+      }),
+
+      // NEW: YouTube average views
+      InfluencerRegistration.distinct("youtubeAverageViews", {
+        youtubeAverageViews: { $gt: 0 },
+      }),
+
+      // NEW: Birth dates for calculating ages
+      InfluencerRegistration.find({
+        dateOfBirth: { $nin: ["", null] },
+      })
+        .select("dateOfBirth")
+        .lean(),
     ]);
+  
 
     const cleanOptions = (values) =>
       [
@@ -620,6 +887,35 @@ router.get("/influencer-filter-options", async (req, res, next) => {
             .filter(Boolean)
         ),
       ].sort((a, b) => a.localeCompare(b));
+ // Calculate current age from dateOfBirth.
+    const calculateAge = (dateOfBirth) => {
+      if (!dateOfBirth) return null;
+
+      const dob = new Date(dateOfBirth);
+
+      if (Number.isNaN(dob.getTime())) return null;
+
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+
+      const birthdayNotReached =
+        today.getMonth() < dob.getMonth() ||
+        (today.getMonth() === dob.getMonth() &&
+          today.getDate() < dob.getDate());
+
+      if (birthdayNotReached) age--;
+
+      return age >= 0 && age <= 120 ? age : null;
+    };
+
+    const ages = [
+      ...new Set(
+        dateOfBirths
+          .map((item) => calculateAge(item.dateOfBirth))
+          .filter((age) => age !== null)
+      ),
+    ].sort((a, b) => a - b);
+
 
     return res.json({
       success: true,
@@ -630,6 +926,31 @@ router.get("/influencer-filter-options", async (req, res, next) => {
         categories: cleanOptions(categories),
         languages: cleanOptions(languages),
         platforms: cleanOptions(platforms),
+         // NEW OPTIONS
+        instagramAverageViews: [
+          ...new Set(
+            instagramAverageViews
+              .map(Number)
+              .filter((value) => Number.isFinite(value) && value > 0)
+          ),
+        ].sort((a, b) => a - b),
+
+        genders: cleanOptions(genders),
+
+        ages,
+
+        youtubeSubscribersRanges: cleanOptions(
+          youtubeSubscribersRanges
+        ),
+
+        youtubeAverageViews: [
+          ...new Set(
+            youtubeAverageViews
+              .map(Number)
+              .filter((value) => Number.isFinite(value) && value > 0)
+          ),
+        ].sort((a, b) => a - b),
+      
       },
     });
   } catch (error) {
