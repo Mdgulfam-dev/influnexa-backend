@@ -367,6 +367,29 @@ toNumber(body.commercialsFor1LinkedInPost),
 
         commercialsFor1LinkedInReel:
           toNumber(body.commercialsFor1LinkedInReel),
+
+
+
+                  // =====================================
+        // FACEBOOK
+        // =====================================
+        facebookUsername:
+          normalizeText(body.facebookUsername),
+
+        facebookProfileLink:
+          normalizeText(body.facebookProfileLink),
+
+        facebookFollowersRange:
+          normalizeText(body.facebookFollowersRange),
+
+        facebookAverageViews:
+          toNumber(body.facebookAverageViews),
+
+        commercialsFor1FacebookPost:
+          toNumber(body.commercialsFor1FacebookPost),
+
+        commercialsFor1FacebookReel:
+          toNumber(body.commercialsFor1FacebookReel),
         // =====================================
         // OTHER INFORMATION
         // =====================================
