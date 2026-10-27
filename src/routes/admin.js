@@ -742,6 +742,9 @@ function registrationFilter(query, type) {
             }
           : {}),
 
+          // Campaign Name
+...valuesFilter(query.campaignName, "campaignName"),
+
         // Age range
         ...buildInfluencerAgeFilter(query.age),
       };
@@ -835,11 +838,13 @@ router.get("/influencer-filter-options", async (req, res, next) => {
       categories,
       languages,
       platforms,
+      campaignName,
        instagramAverageViews,
       genders,
       youtubeSubscribersRanges,
       youtubeAverageViews,
       dateOfBirths,
+      
     
     ] = await Promise.all([
       InfluencerRegistration.distinct("city"),
@@ -848,9 +853,11 @@ router.get("/influencer-filter-options", async (req, res, next) => {
       InfluencerRegistration.distinct("categories"),
       InfluencerRegistration.distinct("languages"),
       InfluencerRegistration.distinct("whatAllPlatformsAreYouAvailableOn"),
+      InfluencerRegistration.distinct("campaignName"),
        // NEW: Instagram average views
       InfluencerRegistration.distinct("instagramAverageViews", {
         instagramAverageViews: { $gt: 0 },
+        
       }),
 
       // NEW: Gender
@@ -926,6 +933,7 @@ router.get("/influencer-filter-options", async (req, res, next) => {
         categories: cleanOptions(categories),
         languages: cleanOptions(languages),
         platforms: cleanOptions(platforms),
+        campaigns: cleanOptions(campaignName),
          // NEW OPTIONS
         instagramAverageViews: [
           ...new Set(
@@ -1335,6 +1343,7 @@ router.get(
           assignedStatus: saved?.status || "Pending",
           readyToCampaign: saved?.readyToCampaign || "",
           commercial: saved?.commercial || "",
+          quoteCommercial: saved?.quoteCommercial || "",
         };
 
         
@@ -1360,7 +1369,7 @@ router.put(
   async (req, res, next) => {
     try {
       const { brandTicketId, creatorId } = req.params;
-      const { status, readyToCampaign, commercial } = req.body;
+      const { status, readyToCampaign, commercial, quoteCommercial, } = req.body;
 
       const allowedStatus = [
         "",
@@ -1419,6 +1428,7 @@ router.put(
           status: "",
           readyToCampaign: "",
           commercial: "",
+            quoteCommercial: "",
         });
 
         detail = assignment.creatorDetails[
@@ -1439,6 +1449,10 @@ router.put(
         detail.commercial = String(commercial);
       }
 
+      if (quoteCommercial !== undefined) {
+  detail.quoteCommercial = String(quoteCommercial);
+}
+
       // Persist changes to MongoDB
       await assignment.save();
 
@@ -1450,6 +1464,7 @@ router.put(
           status: detail.status,
           readyToCampaign: detail.readyToCampaign,
           commercial: detail.commercial,
+          quoteCommercial: detail.quoteCommercial,
         },
       });
     } catch (error) {
@@ -1693,6 +1708,39 @@ router.patch("/users/:id", async (req, res, next) => {
       return res.status(404).json({ message: "Admin user not found." });
     }
 
+     // Only admin and owner can change passwords of brand accounts.
+    if (req.body.password !== undefined && req.body.password !== "") {
+      if (user.role !== "brand") {
+        return res.status(403).json({
+          message: "You can only change passwords for brand accounts.",
+        });
+      }
+
+      if (typeof req.body.password !== "string" ||
+          req.body.password.trim().length < 8) {
+        return res.status(400).json({
+          message: "Password must be at least 8 characters.",
+        });
+      }
+
+      user.setPassword(req.body.password);
+    }
+
+    // Preserve existing owner-account protections.
+    if (user.role === "owner") {
+      if (update.role && update.role !== "owner") {
+        return res.status(403).json({
+          message: "Owner access cannot be removed.",
+        });
+      }
+
+      if (update.status && update.status !== "active") {
+        return res.status(403).json({
+          message: "Owner access cannot be disabled.",
+        });
+      }
+    }
+
     if (user.role === "owner") {
       if (update.role && update.role !== "owner") {
         return res.status(403).json({ message: "Owner access cannot be removed." });
@@ -1709,10 +1757,7 @@ router.patch("/users/:id", async (req, res, next) => {
 
     Object.assign(user, update);
 
-    if (req.body.password) {
-      return res.status(403).json({ message: "Users can only change their own password from the password form." });
-    }
-
+   
     await user.save();
 
     res.json({
