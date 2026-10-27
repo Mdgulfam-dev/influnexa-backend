@@ -421,6 +421,7 @@ toNumber(body.commercialsFor1LinkedInPost),
 
         platform:
           normalizeText(body.platform),
+          campaignName: normalizeText(body.campaignName),
 
         timestamp:
           normalizeText(body.timestamp),
