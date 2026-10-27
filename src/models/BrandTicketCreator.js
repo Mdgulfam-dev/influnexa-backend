@@ -45,6 +45,10 @@ const brandTicketCreatorSchema = new mongoose.Schema(
           type: String,
           default: "",
         },
+        quoteCommercial: {
+  type: String,
+  default: "",
+},
 
       },
     ],
