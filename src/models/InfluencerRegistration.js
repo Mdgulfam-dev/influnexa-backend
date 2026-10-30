@@ -358,8 +358,7 @@ default:0,
   type: String,
   default: "",
   trim: true,
-},
-    
+}, 
   },
   {
     timestamps: true,
