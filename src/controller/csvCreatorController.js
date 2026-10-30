@@ -1131,51 +1131,56 @@ return res.status(200).json({
   }
 };
 
-//  EDIT CSV CREATOR
-export const updateCsvCreator = async (req, res) => {
 
+// EDIT CSV CREATOR
+export const updateCsvCreator = async (req, res) => {
   try {
-   console.log("REQ BODY:", req.body);
-    console.log("ADMIN EMAIL RECEIVED:",req.body.updatedBy);
-    const updatedCreator = await CsvCreator.findByIdAndUpdate(
-      req.params.id,
-    {
+    console.log("REQ BODY:", req.body);
+
+    const updateData = {
       ...req.body,
       editStatus: "Edited Manually",
-        updatedAt: new Date(),
-    },
+      updatedAt: new Date(),
+    };
+
+    // Save admin name whenever QC status changes
+    if (req.body.qcStatus !== undefined) {
+      updateData.qcCheckedBy = req.body.qcCheckedBy || "";
+    }
+
+    const updatedCreator = await CsvCreator.findByIdAndUpdate(
+      req.params.id,
+      updateData,
       {
-        new:true,
-         runValidators: true,
+        new: true,
+        runValidators: true,
       }
     );
 
-if (!updatedCreator) {
+    if (!updatedCreator) {
       return res.status(404).json({
         success: false,
         message: "Creator not found",
       });
     }
 
-    console.log("ADMIN EMAIL SAVED:", updatedCreator.updatedBy);
-    res.status(200).json({
-      success:true,
-      creator: updatedCreator
+    console.log("QC CHECKED BY:", updatedCreator.qcCheckedBy);
+
+    return res.status(200).json({
+      success: true,
+      creator: updatedCreator,
     });
 
-
-  } catch(error){
-
+  } catch (error) {
     console.log("UPDATE CSV ERROR:", error);
 
-    res.status(500).json({
-      success:false,
-      message:error.message
+    return res.status(500).json({
+      success: false,
+      message: error.message,
     });
-
   }
-
 };
+
 
 // get latest report
 

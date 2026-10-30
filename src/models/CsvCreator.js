@@ -248,6 +248,34 @@ creatorRating: {
       type: Date,
       default: Date.now,
     },
+qcStatus: {
+  type: String,
+  enum: [
+    "PENDING_QC",
+    "IN_PROGRESS",
+    "VERIFIED",
+    "NEEDS_CORRECTION",
+    "REJECTED",
+    "NEEDS_UPDATE",
+    "ON_HOLD",
+  ],
+  default: "PENDING_QC",
+},
+
+qcRemark: {
+  type: String,
+  default: "",
+},
+
+qcLastUpdatedAt: {
+  type: Date,
+  default: null,
+},
+qcCheckedBy: {
+  type: String,
+  default: "",
+},
+
   },
   {
     timestamps: true,

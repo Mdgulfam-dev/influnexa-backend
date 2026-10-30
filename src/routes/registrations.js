@@ -456,5 +456,4 @@ toNumber(body.commercialsFor1LinkedInPost),
     return next(error);
   }
 });
-
 export default router;
