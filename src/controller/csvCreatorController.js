@@ -1989,6 +1989,43 @@ if (age) {
   }
 }
 
+// QC STATUS FILTER
+if (req.query.qcStatus) {
+  const qcStatuses = String(req.query.qcStatus)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (qcStatuses.length > 0) {
+    const qcConditions = [];
+
+    qcStatuses.forEach((status) => {
+      if (status === "PENDING_QC") {
+        qcConditions.push({
+          $or: [
+            { qcStatus: "PENDING_QC" },
+            { qcStatus: { $exists: false } },
+            { qcStatus: "" },
+            { qcStatus: null },
+          ],
+        });
+      } else {
+        qcConditions.push({
+          qcStatus: status,
+        });
+      }
+    });
+
+    filter.$and = [
+      ...(filter.$and || []),
+      {
+        $or: qcConditions.flatMap((condition) =>
+          condition.$or ? condition.$or : [condition]
+        ),
+      },
+    ];
+  }
+}
 
 
 
